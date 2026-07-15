@@ -8,7 +8,7 @@ class InvalidTweetURL(ValueError):
 
 _HOSTS = {
     "twitter.com", "www.twitter.com", "mobile.twitter.com", "m.twitter.com",
-    "x.com", "www.x.com", "mobile.x.com",
+    "x.com", "www.x.com", "mobile.x.com", "m.x.com",
     "fxtwitter.com", "www.fxtwitter.com",
     "vxtwitter.com", "www.vxtwitter.com",
     "fixupx.com", "www.fixupx.com",

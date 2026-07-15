@@ -16,6 +16,9 @@ VALID = [
     ("https://fixupx.com/jack/status/1234567890123456789", "1234567890123456789"),
     ("https://twittpr.com/jack/status/1234567890123456789", "1234567890123456789"),
     ("  https://x.com/jack/status/20  ", "20"),
+    ("https://m.x.com/jack/status/20", "20"),
+    ("https://m.twitter.com/jack/status/20", "20"),
+    ("https://www.fxtwitter.com/jack/status/20", "20"),
 ]
 
 INVALID = [
