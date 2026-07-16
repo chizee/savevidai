@@ -1,68 +1,145 @@
-import yt_dlp
+"""Resolve tweets to downloadable video variants via the FixTweet public API.
 
-from .errors import NO_VIDEO, app_error, map_extractor_error
+Twitter closed anonymous/guest video access, so yt-dlp can no longer read video
+without a logged-in account's cookies. The fxtwitter API (api.fxtwitter.com) needs
+no auth and returns video.twimg.com URLs, so the browser still downloads straight
+from Twitter's CDN. vxtwitter is a lower-fidelity fallback (single quality) used
+only when fxtwitter has a transport/upstream failure. When extraction breaks, the
+fix is usually a FixTweet-side change, not ours; see CONTRIBUTING.
+"""
+import re
+
+import httpx
+
+from .errors import NOT_FOUND, NO_VIDEO, PRIVATE, UPSTREAM, AppError, app_error
 from .schemas import MediaItem, ResolveResponse, Variant
-from .urls import canonical_url
 
-_YDL_OPTS = {"quiet": True, "no_warnings": True, "skip_download": True}
+_FX_URL = "https://api.fxtwitter.com/i/status/{}"
+_VX_URL = "https://api.vxtwitter.com/i/status/{}"
+_UA = "SaveVidAI/1.0 (+https://savevidai.app)"
+_RES_RE = re.compile(r"/(\d+)x(\d+)/")
+_TWIMG = "https://video.twimg.com/"
 
 
 def extract(tweet_id: str) -> ResolveResponse:
-    """Resolve a tweet ID to its video variants via yt-dlp (metadata only, no download)."""
+    """Resolve a tweet ID to its video variants. fxtwitter primary, vxtwitter fallback."""
     try:
-        with yt_dlp.YoutubeDL(_YDL_OPTS) as ydl:
-            info = ydl.extract_info(canonical_url(tweet_id), download=False)
-    except yt_dlp.utils.DownloadError as exc:
-        raise map_extractor_error(exc) from exc
-    return map_info(tweet_id, info)
+        return map_fxtwitter(tweet_id, _get_json(_FX_URL.format(tweet_id)))
+    except AppError as first:
+        if first.code != UPSTREAM[0]:
+            raise  # definitive not_found/private/no_video: do not retry
+        try:
+            return map_vxtwitter(tweet_id, _get_json(_VX_URL.format(tweet_id)))
+        except AppError:
+            raise first from None
 
 
-def map_info(tweet_id: str, info: dict) -> ResolveResponse:
-    entries = info.get("entries") if info.get("_type") == "playlist" else [info]
+def _get_json(url: str) -> dict:
+    """GET and parse JSON. Any transport error or non-JSON body maps to UPSTREAM.
+
+    Returns the parsed body regardless of HTTP status: FixTweet sends its JSON
+    (with a `code` field) even on 404/401, and the caller interprets that code.
+    """
+    try:
+        resp = httpx.get(url, headers={"User-Agent": _UA}, timeout=10.0, follow_redirects=True)
+    except httpx.HTTPError as exc:
+        raise app_error(UPSTREAM) from exc
+    try:
+        body = resp.json()
+    except ValueError as exc:
+        raise app_error(UPSTREAM) from exc
+    if not isinstance(body, dict):
+        raise app_error(UPSTREAM)
+    return body
+
+
+def _parse_res(url: str) -> tuple[int | None, int | None]:
+    m = _RES_RE.search(url)
+    if not m:
+        return None, None
+    return int(m.group(1)), int(m.group(2))
+
+
+def _mp4_variant(url: str) -> Variant | None:
+    if not url.startswith(_TWIMG):
+        return None
+    width, height = _parse_res(url)
+    return Variant(label=f"{height}p" if height else "video", width=width, height=height, url=url)
+
+
+def map_fxtwitter(tweet_id: str, body: dict) -> ResolveResponse:
+    code = body.get("code")
+    if code == 401:
+        raise app_error(PRIVATE)
+    if code == 404:
+        raise app_error(NOT_FOUND)
+    if code != 200:
+        raise app_error(UPSTREAM)
+    tweet = body.get("tweet") or {}
+    author = tweet.get("author") or {}
     items: list[MediaItem] = []
-    for i, entry in enumerate([e for e in (entries or []) if e], start=1):
-        item = _map_entry(entry, i)
-        if item is not None:
-            items.append(item)
+    for i, vid in enumerate((tweet.get("media") or {}).get("videos") or [], start=1):
+        variants: list[Variant] = []
+        for var in vid.get("variants") or []:
+            if var.get("content_type") != "video/mp4":
+                continue  # skip HLS playlists
+            variant = _mp4_variant(var.get("url") or "")
+            if variant:
+                variants.append(variant)
+        if not variants:
+            continue
+        variants.sort(key=lambda v: (v.height or 0, v.width or 0), reverse=True)
+        items.append(MediaItem(
+            index=i,
+            kind="gif" if vid.get("type") == "gif" else "video",
+            thumbnail=vid.get("thumbnail_url"),
+            duration_seconds=vid.get("duration"),
+            variants=variants,
+        ))
     if not items:
         raise app_error(NO_VIDEO)
-    handle = info.get("uploader_id") or "unknown"
+    handle = author.get("screen_name") or "unknown"
     return ResolveResponse(
         id=tweet_id,
-        author=info.get("uploader") or handle,
+        author=author.get("name") or handle,
         handle=handle,
-        text=(info.get("description") or "").strip(),
+        avatar_url=author.get("avatar_url"),
+        text=(tweet.get("text") or "").strip(),
         items=items,
     )
 
 
-def _map_entry(entry: dict, index: int) -> MediaItem | None:
-    variants: list[Variant] = []
-    for f in entry.get("formats") or []:
-        url = f.get("url") or ""
-        if f.get("vcodec") in (None, "none"):
-            continue  # audio-only
-        if not url.startswith("https://video.twimg.com/"):
+def map_vxtwitter(tweet_id: str, body: dict) -> ResolveResponse:
+    if body.get("error"):
+        raise app_error(NOT_FOUND)
+    handle = body.get("user_screen_name") or "unknown"
+    items: list[MediaItem] = []
+    index = 0
+    for media in body.get("media_extended") or []:
+        if media.get("type") not in ("video", "gif"):
+            continue  # skip images
+        variant = _mp4_variant(media.get("url") or "")
+        if not variant:
             continue
-        if f.get("protocol") not in (None, "https", "http"):
-            continue  # skip HLS playlists; browsers download plain mp4s
-        height = f.get("height")
-        variants.append(
-            Variant(
-                label=f"{height}p" if height else "video",
-                width=f.get("width"),
-                height=height,
-                url=url,
-            )
-        )
-    if not variants:
-        return None
-    variants.sort(key=lambda v: (v.height or 0, v.width or 0), reverse=True)
-    kind = "gif" if "/tweet_video/" in variants[0].url else "video"
-    return MediaItem(
-        index=index,
-        kind=kind,
-        thumbnail=entry.get("thumbnail"),
-        duration_seconds=entry.get("duration"),
-        variants=variants,
+        index += 1
+        size = media.get("size") or {}
+        if variant.height is None and size.get("height"):
+            variant = Variant(label=f"{size['height']}p", width=size.get("width"),
+                              height=size.get("height"), url=variant.url)
+        millis = media.get("duration_millis")
+        items.append(MediaItem(
+            index=index,
+            kind="gif" if media.get("type") == "gif" else "video",
+            thumbnail=media.get("thumbnail_url"),
+            duration_seconds=(millis / 1000.0) if millis else None,
+            variants=[variant],
+        ))
+    if not items:
+        raise app_error(NO_VIDEO)
+    return ResolveResponse(
+        id=tweet_id,
+        author=body.get("user_name") or handle,
+        handle=handle,
+        text=(body.get("text") or "").strip(),
+        items=items,
     )
