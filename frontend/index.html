@@ -3,13 +3,92 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SaveVid AI</title>
+    <title>Twitter Video Downloader - Free, Fast, No Ads | SaveVid AI</title>
+    <meta name="description" content="Download Twitter/X videos and GIFs in original quality. No popups, no redirects, no fake download buttons. Free, open source, and instant." />
+    <link rel="canonical" href="https://savevidai.app/" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://savevidai.app/" />
+    <meta property="og:title" content="Twitter Video Downloader - Free, Fast, No Ads | SaveVid AI" />
+    <meta property="og:description" content="Paste a post link, pick a quality, done. No popups, no fake buttons, open source." />
+    <meta property="og:image" content="https://savevidai.app/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Twitter Video Downloader - Free, Fast, No Ads | SaveVid AI" />
+    <meta name="twitter:description" content="Paste a post link, pick a quality, done. No popups, no fake buttons, open source." />
+    <meta name="twitter:image" content="https://savevidai.app/og.png" />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is SaveVid AI really free and ad-free?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. There are no popups, no redirects, and no fake download buttons, ever. The project is open source, so you can verify that yourself or even run your own copy." }
+        },
+        {
+          "@type": "Question",
+          "name": "What quality can I download Twitter videos in?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Every quality Twitter serves, up to the original upload resolution (often 720p or 1080p). SaveVid AI lists all available resolutions with file sizes and you pick one." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I download videos from private or age-restricted posts?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. SaveVid AI only works with public posts and is honest about that limitation." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is it legal to download Twitter videos?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Downloading for personal use, like saving your own content or archiving, is generally fine. Reposting someone else's video without permission can infringe their copyright. You are responsible for how you use downloaded content." }
+        }
+      ]
+    }
+    </script>
     <script>
       try { if (localStorage.theme === "light") document.documentElement.classList.remove("dark"); } catch (e) {}
     </script>
   </head>
   <body class="bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 font-sans antialiased">
     <div id="root"></div>
+
+    <!-- Static, crawlable landing content. Lives outside the React root on purpose. -->
+    <section class="mx-auto max-w-2xl px-4 py-16 border-t border-zinc-200 dark:border-zinc-800">
+      <h2 class="text-2xl font-semibold tracking-tight">How to download a Twitter video</h2>
+      <ol class="mt-4 space-y-3 text-zinc-600 dark:text-zinc-400 list-decimal list-inside">
+        <li>Copy the link of the post that contains the video (Share, then Copy link).</li>
+        <li>Paste it in the box above. The preview appears in about a second.</li>
+        <li>Pick a quality and the video saves straight to your device.</li>
+      </ol>
+    </section>
+
+    <section class="mx-auto max-w-2xl px-4 pb-16">
+      <h2 class="text-2xl font-semibold tracking-tight">Frequently asked questions</h2>
+      <dl class="mt-4 space-y-6 text-sm">
+        <div>
+          <dt class="font-medium text-base">Is SaveVid AI really free and ad-free?</dt>
+          <dd class="mt-1 text-zinc-600 dark:text-zinc-400">Yes. No popups, no redirects, no fake download buttons, ever. The code is open source, so you can verify that yourself or run your own copy.</dd>
+        </div>
+        <div>
+          <dt class="font-medium text-base">What quality do I get?</dt>
+          <dd class="mt-1 text-zinc-600 dark:text-zinc-400">Every quality Twitter serves, up to the original upload resolution. All options are listed with file sizes; you choose.</dd>
+        </div>
+        <div>
+          <dt class="font-medium text-base">Do private or age-restricted posts work?</dt>
+          <dd class="mt-1 text-zinc-600 dark:text-zinc-400">No. SaveVid AI only works with public posts, and we would rather say that plainly than pretend otherwise.</dd>
+        </div>
+        <div>
+          <dt class="font-medium text-base">Is downloading Twitter videos legal?</dt>
+          <dd class="mt-1 text-zinc-600 dark:text-zinc-400">Personal use, like archiving your own posts, is generally fine. Reposting someone else's work without permission can infringe copyright. Use downloads responsibly.</dd>
+        </div>
+        <div>
+          <dt class="font-medium text-base">Who runs this?</dt>
+          <dd class="mt-1 text-zinc-600 dark:text-zinc-400">SaveVid AI is an open source project. Read the code, star it, or self-host it from the <a class="link-sweep text-cyan-500" href="https://github.com/OWNER/savevidai">GitHub repository</a>.</dd>
+        </div>
+      </dl>
+    </section>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
