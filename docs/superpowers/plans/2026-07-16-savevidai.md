@@ -1448,6 +1448,42 @@ export default defineConfig({
   padding: 0.125rem 0.5rem;
 }
 
+/* Hero background: single swappable file (/hero.webp) behind the headline.
+   The ::after gradient is the theme-aware overlay that keeps text readable. */
+.hero-bg {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 26rem;
+  overflow: hidden;
+  z-index: -1;
+  pointer-events: none;
+}
+.hero-bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+}
+.hero-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.82) 0%,
+    rgb(255 255 255 / 0.92) 55%,
+    rgb(255 255 255) 100%
+  );
+}
+.dark .hero-bg::after {
+  background: linear-gradient(
+    to bottom,
+    rgb(9 9 11 / 0.8) 0%,
+    rgb(9 9 11 / 0.92) 55%,
+    rgb(9 9 11) 100%
+  );
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -2733,7 +2769,13 @@ export default function App() {
   }, [resolve]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center px-4">
+    <div className="relative isolate flex min-h-screen flex-col items-center px-4">
+      {/* Hero background: single swappable file at frontend/public/hero.webp, behind the
+          headline. aria-hidden (decorative). The .hero-bg::after gradient (in index.css)
+          is the theme-aware overlay that keeps the H1/subhead readable in light and dark. */}
+      <div aria-hidden className="hero-bg">
+        <img src="/hero.webp" alt="" decoding="async" />
+      </div>
       <header className="flex w-full max-w-2xl items-center justify-between pt-4">
         <span className="font-semibold tracking-tight text-cyan-400">SaveVid AI</span>
         <ThemeToggle />
@@ -2772,7 +2814,58 @@ export default function App() {
 }
 ```
 
-- [ ] **Step 5: Update the Task 9 smoke test to match the new H1**
+- [ ] **Step 4c: Hero background image** (added 2026-07-16 by user request)
+
+The hero renders `frontend/public/hero.webp` behind the headline. Single swappable file: replacing `hero.webp` (any landscape image) rebrands the hero with no code change. In `App.tsx`, the root div gains `relative isolate` and its first child is:
+
+```tsx
+{/* Swap frontend/public/hero.webp to change the hero art; overlay keeps text readable in both themes */}
+<div aria-hidden className="hero-bg">
+  <img src="/hero.webp" alt="" decoding="async" />
+</div>
+```
+
+Append to `frontend/src/styles/index.css` (before the reduced-motion block):
+
+```css
+/* Hero background: single swappable file (/hero.webp) behind the headline.
+   The ::after gradient is the theme-aware overlay that keeps text readable. */
+.hero-bg {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 26rem;
+  overflow: hidden;
+  z-index: -1;
+  pointer-events: none;
+}
+.hero-bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+}
+.hero-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.82) 0%,
+    rgb(255 255 255 / 0.92) 55%,
+    rgb(255 255 255) 100%
+  );
+}
+.dark .hero-bg::after {
+  background: linear-gradient(
+    to bottom,
+    rgb(9 9 11 / 0.8) 0%,
+    rgb(9 9 11 / 0.92) 55%,
+    rgb(9 9 11) 100%
+  );
+}
+```
+
+The image is `aria-hidden` decoration with empty alt; the gradient overlay swaps with
 
 Replace the assertion in `frontend/src/test/smoke.test.tsx`:
 
