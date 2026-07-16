@@ -4,15 +4,17 @@
 
 **Goal:** Build SaveVid AI, an open source Twitter/X video downloader: paste a post URL, preview it, pick a quality, download straight from Twitter's CDN.
 
-**Architecture:** One repo, one Docker container. FastAPI wraps yt-dlp in metadata-only mode and serves the built React SPA as static files. The browser downloads video bytes directly from video.twimg.com (blob fetch with progress), with a locked-down server proxy as fallback. No database, no accounts.
+**Architecture:** One repo, one Docker container. FastAPI resolves tweet URLs to video variants via the FixTweet public API (fxtwitter, with vxtwitter fallback) and serves the built React SPA as static files. The browser downloads video bytes directly from video.twimg.com (blob fetch with progress), with a locked-down server proxy as fallback. No database, no accounts.
 
-**Tech Stack:** Python 3.12, FastAPI, yt-dlp, slowapi, httpx, pytest, respx. TypeScript, Vite 6, React, Tailwind CSS v4, Motion (`motion` package), Vitest, Testing Library. Docker, Caddy, Render, GitHub Actions.
+> Note: Tasks 3 and 5 below were originally written around yt-dlp. Task 5b (added during the build, after live testing showed Twitter closed anonymous video access to yt-dlp) replaced the extractor with the FixTweet API. The yt-dlp code and its error-mapping in the Task 3/5 bodies are historical; the shipped extractor is Task 5b's.
+
+**Tech Stack:** Python 3.12, FastAPI, httpx, slowapi, pydantic, pytest, respx. TypeScript, Vite 6, React, Tailwind CSS v4, Motion (`motion` package), Vitest, Testing Library. Docker, Caddy, Render, GitHub Actions.
 
 **Spec:** `docs/superpowers/specs/2026-07-16-savevidai-design.md` (read it before starting).
 
 ## Global Constraints
 
-- Python >= 3.12. Backend deps: fastapi, uvicorn[standard], yt-dlp, slowapi, httpx, pydantic v2. Dev: pytest, respx, ruff.
+- Python >= 3.12. Backend deps: fastapi, uvicorn[standard], slowapi, httpx, pydantic v2 (yt-dlp removed in Task 5b; extraction is via the FixTweet API over httpx). Dev: pytest, respx, ruff.
 - Node 22. Frontend: react, react-dom, motion, @fontsource-variable/geist, @fontsource-variable/geist-mono. TypeScript strict. Tailwind v4 via @tailwindcss/vite.
 - No third-party requests at runtime from the page: fonts self-hosted, no analytics, no CDN scripts, no cookies.
 - Error copy is verbatim from the spec table in "Error handling" (reproduced in Task 3 code).
@@ -3184,9 +3186,11 @@ Live smoke test: `BASE_URL=http://localhost:8000 TWEET_URL=<public tweet with vi
 
 ## When extraction breaks
 
-Twitter changes internals regularly. Nine times out of ten the fix is bumping yt-dlp:
-update the `yt-dlp` floor in `backend/pyproject.toml`, run the smoke test, release.
-See CONTRIBUTING for details.
+SaveVid AI resolves videos through the FixTweet public API (`api.fxtwitter.com`),
+with `api.vxtwitter.com` as a fallback, because Twitter closed anonymous video
+access to yt-dlp. If resolving stops working, first check whether FixTweet itself
+is up, then check whether their JSON shape changed (`backend/app/extractor.py`
+maps it). Run the smoke test to confirm. See CONTRIBUTING for details.
 
 ## Traffic stats without tracking
 
@@ -3205,21 +3209,27 @@ MIT
 
 ## The most common fix: extraction broke
 
-Twitter changed something and `/api/resolve` returns `upstream_error` for everything.
+`/api/resolve` returns `upstream_error` (or `no_video`) for everything.
 
-1. `pip install -U yt-dlp` in your venv and rerun the smoke test
-   (`scripts/smoke.py`). If it passes, bump the floor in `backend/pyproject.toml`
-   and open a PR titled `chore: bump yt-dlp`.
-2. If the latest yt-dlp still fails, check the yt-dlp issue tracker for the
-   Twitter extractor before debugging here; the fix almost always lands there.
-3. If yt-dlp works but our mapping drops something, fix `backend/app/extractor.py`
-   (`map_info` is pure and tested with fixture dicts; add a fixture reproducing
-   the new shape).
+SaveVid AI resolves through the FixTweet public API (`api.fxtwitter.com`) with an
+`api.vxtwitter.com` fallback. yt-dlp is NOT used: Twitter closed anonymous/guest
+video access, so yt-dlp needs logged-in cookies, which a public no-login site
+can't rely on.
 
-## New error wording from Twitter
+1. Check whether FixTweet is up: `curl -s https://api.fxtwitter.com/i/status/20`
+   should return JSON with `"code": 200`. If both fxtwitter and vxtwitter are
+   down, resolution fails until they recover (they are actively maintained
+   because Discord link embeds depend on them).
+2. If FixTweet is up but returns a new JSON shape, fix the mapping in
+   `backend/app/extractor.py` (`map_fxtwitter` / `map_vxtwitter` are pure and
+   tested with fixture dicts; add a fixture reproducing the new shape).
+3. Run `scripts/smoke.py` against a public video tweet to confirm the fix.
 
-`backend/app/errors.py` maps yt-dlp message substrings to user-facing errors.
-Add a pattern + test in `backend/tests/test_errors.py`.
+## New error wording
+
+`backend/app/errors.py` maps the FixTweet response `code` (and any legacy
+message substrings) to user-facing errors. Add a case + test in
+`backend/tests/test_errors.py` / `test_extractor.py`.
 
 ## Dev setup and tests
 
