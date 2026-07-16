@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { AdSlot } from "./components/AdSlot";
+import { HowToVisual } from "./components/HowToVisual";
 import { PasteInput } from "./components/PasteInput";
 import { PreviewCard } from "./components/PreviewCard";
 import { SkeletonCard } from "./components/SkeletonCard";
@@ -106,6 +107,10 @@ export default function App() {
             {state.status === "ready" && <PreviewCard key="card" data={state.data} />}
           </AnimatePresence>
         </div>
+
+        <motion.div {...fadeRise(5)}>
+          <HowToVisual />
+        </motion.div>
 
         <AdSlot />
       </main>
