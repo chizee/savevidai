@@ -36,7 +36,9 @@ savevidai/
   compose.yaml  VPS deploy (app + Caddy for HTTPS)
 ```
 
-Extraction uses yt-dlp as a Python library in metadata-only mode (`skip_download`). It resolves a tweet URL to its mp4 variant URLs on video.twimg.com. The server never downloads video content in the normal path. When Twitter changes internals, the fix is a yt-dlp version bump.
+Extraction resolves a tweet URL to its mp4 variant URLs on video.twimg.com via the FixTweet public API (`api.fxtwitter.com`), with `api.vxtwitter.com` as a lower-fidelity fallback. The server never downloads video content in the normal path. When resolution breaks, the fix is usually a FixTweet-side change, not ours.
+
+> **Revised 2026-07-16 (during build):** the original design used yt-dlp in metadata-only mode. Live verification showed Twitter has closed anonymous/guest video access, so yt-dlp (even latest) returns no video without a logged-in account's cookies. The fxtwitter API needs no auth and returns the same `video.twimg.com` URLs, so the resolve source was switched. Everything downstream (download flow, proxy, schema, UI) is unchanged. Twitter's CDN sends `Access-Control-Allow-Origin` echoing the caller, so direct browser downloads still work and the server stays near-zero-bandwidth.
 
 ## API
 
@@ -164,7 +166,7 @@ Traffic is the whole growth plan, so the page is built to rank, not just to work
 
 ## Risks
 
-- Twitter breaks extraction: highest-likelihood risk. Mitigation: yt-dlp dependency, version bump releases, CI badge showing live smoke test status.
+- Twitter breaks extraction: highest-likelihood risk. Mitigation: fxtwitter primary + vxtwitter fallback (two independent resolvers), CI badge showing live smoke test status. If both FixTweet services go down, resolution fails until they recover (they are actively maintained because Discord embeds depend on them).
 - Server IP gets rate-limited by Twitter at scale: mitigation is the cache + per-IP limits; if it ever happens anyway, escape hatch is rotating the VPS IP or adding a second cheap VPS.
 - CDN CORS behavior changes: proxy fallback already designed in.
 - Trademark: name avoids "Twitter"/"Tweet"/"X" marks; site copy says "for Twitter/X" descriptively, which is standard nominative use.
