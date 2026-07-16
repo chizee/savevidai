@@ -455,6 +455,170 @@ a {
   font-weight: 600;
 }
 
+/* Landing sections (static HTML below the app) */
+.kicker {
+  font: 600 0.78rem var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+  color: var(--accent);
+}
+.section-title {
+  margin-top: 0.5rem;
+  font-size: clamp(1.6rem, 3.5vw, 2.1rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+@media (max-width: 640px) {
+  .steps-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.step-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 1.25rem;
+  text-align: left;
+}
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font: 700 0.9rem var(--font-mono);
+}
+.step-card h3 {
+  margin-top: 0.7rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.step-card p {
+  margin-top: 0.3rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* FAQ accordions: native details/summary, crawlable, zero JS */
+.faq details {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--card);
+  padding: 0;
+  transition: border-color 0.2s ease;
+}
+.faq details + details {
+  margin-top: 10px;
+}
+.faq details[open],
+.faq details:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+.faq summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  list-style: none;
+}
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+.faq summary::after {
+  content: "+";
+  flex: none;
+  font: 500 1.2rem var(--font-mono);
+  color: var(--accent);
+  transition: transform 0.2s ease;
+}
+.faq details[open] summary::after {
+  transform: rotate(45deg);
+}
+.faq details p {
+  padding: 0 1.15rem 1.1rem;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+/* Site footer (autopsy pattern: description left, links right, credit row) */
+.site-footer {
+  width: 100%;
+  border-top: 1px solid var(--line);
+  padding: 42px 0 34px;
+  margin-top: 2rem;
+}
+.fwrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 24px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.footer-brand {
+  font-weight: 600;
+  font-size: 1.02rem;
+  letter-spacing: -0.02em;
+}
+.footer-desc {
+  margin-top: 0.35rem;
+  max-width: 44ch;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--faint);
+}
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.footer-links a {
+  padding: 7px 13px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--muted);
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+.footer-links a:hover {
+  color: var(--fg);
+  background: var(--pill);
+}
+.credit-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 26px;
+}
+.credit {
+  color: var(--faint);
+  font-size: 0.9rem;
+}
+.credit a {
+  color: var(--accent);
+  font-weight: 600;
+}
+.credit a:hover {
+  text-decoration: underline;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { AdSlot } from "./components/AdSlot";
-import { Footer } from "./components/Footer";
 import { PasteInput } from "./components/PasteInput";
 import { PreviewCard } from "./components/PreviewCard";
 import { SkeletonCard } from "./components/SkeletonCard";
@@ -110,8 +109,6 @@ export default function App() {
 
         <AdSlot />
       </main>
-
-      <Footer />
     </div>
   );
 }

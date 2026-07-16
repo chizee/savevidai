@@ -24,7 +24,7 @@ CDN to your browser; this server only resolves links.
 ## Self-host
 
 ```bash
-docker run -p 8000:8000 ghcr.io/OWNER/savevidai:latest
+docker run -p 8000:8000 ghcr.io/oxisrafil/savevidai:latest
 ```
 
 Open http://localhost:8000. That's the whole setup.

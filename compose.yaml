@@ -1,7 +1,7 @@
 services:
   app:
     build: .
-    image: ghcr.io/OWNER/savevidai:latest
+    image: ghcr.io/oxisrafil/savevidai:latest
     restart: unless-stopped
 
   caddy:
