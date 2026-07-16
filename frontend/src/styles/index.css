@@ -255,6 +255,23 @@ a {
   color: var(--fg);
   font: 500 0.82rem var(--font-mono);
 }
+/* The one interactive chip: runs the live example */
+.chip-action {
+  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease;
+}
+.chip-action:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  transform: translateY(-1px);
+}
+.chip-action:active {
+  transform: scale(0.97);
+}
 
 /* Panels (preview card, skeleton) */
 .panel {

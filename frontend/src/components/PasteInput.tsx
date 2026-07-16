@@ -1,15 +1,21 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 
 type Props = {
   status: "idle" | "resolving" | "ready" | "error";
   errorMessage: string | null;
   onSubmit: (url: string) => void;
+  /** Externally injected URL (e.g. the example chip); mirrored into the field. */
+  presetValue?: string | null;
 };
 
-export function PasteInput({ status, errorMessage, onSubmit }: Props) {
+export function PasteInput({ status, errorMessage, onSubmit, presetValue = null }: Props) {
   const [value, setValue] = useState("");
   const busy = status === "resolving";
+
+  useEffect(() => {
+    if (presetValue) setValue(presetValue);
+  }, [presetValue]);
 
   function submit(e: FormEvent) {
     e.preventDefault();

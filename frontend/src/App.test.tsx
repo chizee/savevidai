@@ -20,6 +20,19 @@ test("paste-to-card flow", async () => {
   expect(screen.getByText("Jack")).toBeInTheDocument();
 });
 
+test("example chip resolves the showcase tweet and fills the input", async () => {
+  const fetchMock = vi.fn(async () => new Response(JSON.stringify(BODY), { status: 200 }));
+  vi.stubGlobal("fetch", fetchMock);
+  render(<App />);
+  await userEvent.click(screen.getByRole("button", { name: /try an example/i }));
+  expect(await screen.findByTestId("preview-card")).toBeInTheDocument();
+  const call = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+  expect(String(call[1].body)).toContain("/israfill/status/2077383034639094193");
+  expect(screen.getByRole("textbox")).toHaveValue(
+    "https://x.com/israfill/status/2077383034639094193",
+  );
+});
+
 test("error flow shows honest message", async () => {
   vi.stubGlobal("fetch", vi.fn(async () =>
     new Response(JSON.stringify({ error: "no_video", message: "This post has no video." }), { status: 422 })));

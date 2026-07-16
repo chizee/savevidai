@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { AdSlot } from "./components/AdSlot";
 import { HowToVisual } from "./components/HowToVisual";
@@ -9,8 +9,17 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { useResolve } from "./hooks/useResolve";
 import { EASE_OUT, fadeRise } from "./lib/motion";
 
+// The maker's own video post, used as the one-click live demo.
+const EXAMPLE_URL = "https://x.com/israfill/status/2077383034639094193";
+
 export default function App() {
   const { state, resolve } = useResolve();
+  const [prefill, setPrefill] = useState<string | null>(null);
+
+  function runExample() {
+    setPrefill(EXAMPLE_URL);
+    resolve(EXAMPLE_URL);
+  }
 
   // Ctrl/Cmd+V anywhere on the page starts a resolve.
   useEffect(() => {
@@ -88,10 +97,14 @@ export default function App() {
             status={state.status}
             errorMessage={state.status === "error" ? state.message : null}
             onSubmit={resolve}
+            presetValue={prefill}
           />
         </motion.div>
 
         <motion.div {...fadeRise(3)} className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+          <button type="button" className="chip chip-action" onClick={runExample}>
+            ▶ try an example
+          </button>
           <span className="chip">no login</span>
           <span className="chip">no watermark</span>
           <span className="chip">original quality</span>
