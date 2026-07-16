@@ -7,12 +7,15 @@ from Twitter's CDN. vxtwitter is a lower-fidelity fallback (single quality) used
 only when fxtwitter has a transport/upstream failure. When extraction breaks, the
 fix is usually a FixTweet-side change, not ours; see CONTRIBUTING.
 """
+import logging
 import re
 
 import httpx
 
 from .errors import NOT_FOUND, NO_VIDEO, PRIVATE, UPSTREAM, AppError, app_error
 from .schemas import MediaItem, ResolveResponse, Variant
+
+logger = logging.getLogger("savevidai.extractor")
 
 _FX_URL = "https://api.fxtwitter.com/i/status/{}"
 _VX_URL = "https://api.vxtwitter.com/i/status/{}"
@@ -42,6 +45,9 @@ def _map_guarded(mapper, tweet_id: str, body: dict) -> ResolveResponse:
     except AppError:
         raise
     except Exception as exc:
+        # Spec: upstream failures are logged with the tweet ID so FixTweet-side
+        # breakage (usually a schema change) is visible immediately.
+        logger.warning("mapping failed for tweet %s via %s: %r", tweet_id, mapper.__name__, exc)
         raise app_error(UPSTREAM) from exc
 
 
@@ -54,12 +60,15 @@ def _get_json(url: str) -> dict:
     try:
         resp = httpx.get(url, headers={"User-Agent": _UA}, timeout=10.0, follow_redirects=True)
     except httpx.HTTPError as exc:
+        logger.warning("upstream fetch failed for %s: %r", url, exc)
         raise app_error(UPSTREAM) from exc
     try:
         body = resp.json()
     except ValueError as exc:
+        logger.warning("upstream returned non-JSON for %s (status %s)", url, resp.status_code)
         raise app_error(UPSTREAM) from exc
     if not isinstance(body, dict):
+        logger.warning("upstream returned non-object JSON for %s", url)
         raise app_error(UPSTREAM)
     return body
 
