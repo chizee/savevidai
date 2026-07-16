@@ -32,9 +32,11 @@ test("renders author, handle, text, and per-item sections", () => {
   expect(screen.getByText("GIF")).toBeInTheDocument();
 });
 
-test("renders one button per variant with label and size", () => {
+test("renders one button per variant with full dimensions, HD chip, and size", () => {
   render(<PreviewCard data={DATA} />);
-  expect(screen.getByRole("button", { name: /720p/ })).toHaveTextContent("2.0 MB");
-  expect(screen.getByRole("button", { name: /360p/ })).toBeInTheDocument();
-  expect(screen.getByRole("button", { name: /480p/ })).toBeInTheDocument();
+  const hd = screen.getByRole("button", { name: /1280×720/ });
+  expect(hd).toHaveTextContent("2.0 MB");
+  expect(hd).toHaveTextContent("HD"); // height >= 720 gets the HD chip
+  expect(screen.getByRole("button", { name: /640×360/ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /480×480/ })).toBeInTheDocument();
 });
