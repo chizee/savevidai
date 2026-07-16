@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { AdSlot } from "./components/AdSlot";
 import { HowToVisual } from "./components/HowToVisual";
@@ -15,11 +15,32 @@ const EXAMPLE_URL = "https://x.com/israfill/status/2077383034639094193";
 export default function App() {
   const { state, resolve } = useResolve();
   const [prefill, setPrefill] = useState<string | null>(null);
+  const navRef = useRef<HTMLElement>(null);
 
   function runExample() {
     setPrefill(EXAMPLE_URL);
     resolve(EXAMPLE_URL);
   }
+
+  // Floating nav tightens past 40px of scroll (class toggle, no re-render churn).
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      nav.classList.toggle("scrolled", window.scrollY > 40);
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
 
   // Ctrl/Cmd+V anywhere on the page starts a resolve.
   useEffect(() => {
@@ -44,7 +65,13 @@ export default function App() {
 
   return (
     <div className="relative isolate flex min-h-screen flex-col items-center overflow-x-clip px-4">
-      <nav className="nav-pill">
+      <motion.nav
+        ref={navRef}
+        className="nav-pill"
+        initial={{ y: -18, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, ease: EASE_OUT }}
+      >
         <span className="brand">
           <span>SaveVid AI</span>
           <span className="brand-dot">.</span>
@@ -56,7 +83,7 @@ export default function App() {
             Download
           </button>
         </span>
-      </nav>
+      </motion.nav>
 
       <main className="w-full max-w-3xl flex-1 pb-24 pt-[clamp(140px,22vh,220px)] text-center">
         <div aria-hidden className="aurora">

@@ -79,6 +79,14 @@ a {
   border: 1px solid var(--line);
   border-radius: 999px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.09);
+  transition:
+    max-width 0.55s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.35s ease;
+}
+/* Scrolled: the pill tightens around its content, autopsy-style */
+.nav-pill.scrolled {
+  max-width: 560px;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.28);
 }
 .brand {
   display: flex;
