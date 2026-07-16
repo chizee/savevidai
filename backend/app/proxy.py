@@ -27,7 +27,7 @@ async def proxy(request: Request, url: str, filename: str = "video.mp4"):
     client = httpx.AsyncClient(timeout=httpx.Timeout(30.0, read=60.0))
     try:
         upstream = await client.send(client.build_request("GET", url), stream=True)
-    except httpx.HTTPError:
+    except (httpx.HTTPError, httpx.InvalidURL):
         await client.aclose()
         _SEM.release()
         raise app_error(UPSTREAM) from None

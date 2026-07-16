@@ -2,6 +2,7 @@ import httpx
 import respx
 from fastapi.testclient import TestClient
 
+import app.proxy as proxy_module
 from app.main import create_app
 
 
@@ -42,3 +43,12 @@ def test_upstream_error():
     res = client().get("/api/proxy", params={"url": "https://video.twimg.com/ext/missing.mp4"})
     assert res.status_code == 502
     assert res.json()["error"] == "upstream_error"
+
+
+@respx.mock
+def test_control_char_url_returns_502_without_leaking_semaphore():
+    before = proxy_module._SEM._value
+    res = client().get("/api/proxy", params={"url": "https://video.twimg.com/x\ny"})
+    assert res.status_code == 502
+    assert res.json()["error"] == "upstream_error"
+    assert proxy_module._SEM._value == before  # permit released, no leak
