@@ -48,6 +48,7 @@ export function QualityButton({
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.97 }}
       data-phase={phase.name}
+      aria-busy={phase.name === "downloading"}
       className={`quality-btn ${primary ? "quality-btn-primary" : ""}`}
     >
       <span
