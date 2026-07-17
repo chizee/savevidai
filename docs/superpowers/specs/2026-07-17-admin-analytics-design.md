@@ -23,8 +23,8 @@ An owner-only dashboard at `/admin` showing aggregate usage of savevidai.israfil
 
 ## Privacy architecture
 
-- Event rows contain: UTC timestamp, event type, outcome/label, 2-letter country (nullable), and a **daily-rotating anonymous visitor hash**: `sha256(ANALYTICS_SALT + utc_date + client_ip)` truncated to 16 hex chars. The raw IP exists only in request memory and is never written, logged, or returned.
-- The hash cannot be reversed and rotates at UTC midnight, so even the anonymous ID cannot link a visitor across days.
+- Event rows contain: UTC timestamp, event type, outcome/label, 2-letter country (nullable), and a **daily-rotating anonymous visitor hash**: `HMAC-SHA256(key=ANALYTICS_SALT, message=utc_date || client_ip)` truncated to 16 hex chars. HMAC (not a bare concat hash) is the correct keyed-hash primitive here. The raw IP exists only in request memory and is never written, logged, or returned.
+- Reversal resistance rests on the salt staying secret (env-only, never in the repo): without it, brute-forcing the IPv4 space is infeasible; the salt must be long and random. The hash rotates at UTC midnight, so even the anonymous ID cannot link a visitor across days.
 - Country comes from the `CF-IPCountry` header when Cloudflare proxying is enabled (owner may flip the DNS record to proxied now that the Render cert is issued); otherwise stored as null and shown as "unknown". No GeoIP database, no IP-based lookup at rest.
 - Retention: events older than 90 days are pruned daily by the writer.
 - Admin authentication uses one cookie set only after the owner logs in; ordinary visitors receive no cookies, so the public FAQ copy remains true.
@@ -62,7 +62,7 @@ CREATE INDEX IF NOT EXISTS idx_events_type_ts ON events(type, ts);
 - `download`: frontend fires `POST /api/event {type:"download", quality:"<label>"}` when a download starts (video bytes never touch the server, so client reporting is the only way to count real downloads). Quality validated against `^\d{2,4}p$|^video$`.
 - `/api/event` is rate-limited 30/minute/IP; unknown types rejected 422. No body fields other than type/quality accepted.
 - Writes are fire-and-forget: endpoints push onto a bounded in-process queue (cap 1000, drop-oldest with a logged warning); a background writer thread batches pipeline inserts every ~5 s. Turso being down never affects users.
-- Enablement: all ingestion, `/api/event`, and `/api/admin/*` return 404/no-op unless `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and `ADMIN_PASSWORD` are all set.
+- Enablement: all ingestion, `/api/event`, and `/api/admin/*` return 404/no-op unless **all four** of `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `ADMIN_PASSWORD`, and `ANALYTICS_SALT` are set. The salt is part of the gate on purpose: running with an empty salt would make visitor hashes brute-forceable, silently breaking the anonymity guarantee.
 
 ## Admin auth
 
@@ -73,9 +73,14 @@ CREATE INDEX IF NOT EXISTS idx_events_type_ts ON events(type, ts);
 
 ## Stats API
 
-`GET /api/admin/stats?days=30&tz=360` (cookie-gated; `tz` = minutes east of UTC from the browser, so day/hour buckets render in the owner's local time; Dhaka = 360). Single JSON response:
+`GET /api/admin/stats?days=30&tz=360` (cookie-gated; `tz` = minutes east of UTC, so day/hour buckets render in the owner's local time; Dhaka = 360). Two hard rules on `tz`:
 
-- `totals`: fetches/downloads/visits for today, 7d, 30d, all-time; unique visitors today; success rate (ok fetches / all fetches, 30d); conversion (fetching visitors / visitors, 30d)
+- **Validation (SQL-injection guard):** the value is interpolated into SQLite's `datetime(ts, '+N minutes')` modifier string, so it must be parsed as an integer and clamped to [-840, 840] before any query is built; anything else is a 422. It is never string-substituted raw.
+- **Sign convention:** JavaScript's `getTimezoneOffset()` returns UTC-minus-local (Dhaka = -360), so the frontend sends `-new Date().getTimezoneOffset()`.
+
+Single JSON response:
+
+- `totals`: fetches/downloads/visits for today, 7d, 30d, all-time; unique visitors today; success rate (ok fetches / all fetches, 30d); conversion rate. Because visitor hashes rotate daily by design, cross-day deduplication is impossible, so multi-day "unique" metrics are defined as **sums of daily distincts**: conversion = sum over the window of daily-distinct visitors who fetched, divided by the sum of daily-distinct visitors. The dashboard labels it "daily-unique basis" so the number is honest.
 - `active_now`: distinct visitors in the last 5 minutes
 - `series`: per-day fetches, downloads, visits, uniques for the window
 - `countries`: top 10 by events, plus unknown bucket
@@ -97,7 +102,9 @@ Separate Vite entry (`admin.html` -> `src/admin/`) so the public bundle and its 
 
 ## Testing
 
-- Visitor hash: rotates across dates, stable within a day, never contains the IP.
+- Visitor hash: HMAC construction, rotates across dates, stable within a day, never contains the IP; empty/missing salt keeps analytics disabled.
+- `tz` param: integers accepted and clamped to [-840, 840]; non-integer and out-of-range values rejected 422; injection strings (`"1); DROP TABLE"`) never reach query text.
+- Conversion math: multi-day windows computed as sums of daily distincts (fixture spanning 3 days with overlapping visitors proves no cross-day dedup is attempted).
 - `client_ip()` precedence (CF header > XFF first hop > client.host).
 - `/api/event` validation matrix and rate limit; disabled-mode returns 404.
 - Auth: constant-time compare called, cookie signing round-trip, expiry rejection, wrong-password 401.
