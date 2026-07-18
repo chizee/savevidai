@@ -13,30 +13,37 @@ test("proxyUrl encodes url and filename", () => {
   expect(u).toBe("/api/proxy?url=https%3A%2F%2Fvideo.twimg.com%2Fv.mp4%3Ftag%3D1&filename=a%20b.mp4");
 });
 
-test("falls back to proxy when direct fetch fails", async () => {
+test("downloads through the proxy and reports streaming progress", async () => {
+  // Twitter's CDN 403s cross-origin fetches, so downloads must go through the
+  // proxy. This asserts a single proxy request (never the raw CDN) and that
+  // progress is reported per chunk with a known total.
   const calls: string[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      calls.push(url);
-      if (url.startsWith("https://video.twimg.com/")) throw new TypeError("cors");
-      // Use ReadableStream for consistent behavior in jsdom
+      calls.push(String(input));
       const stream = new ReadableStream({
         start(controller) {
           controller.enqueue(new Uint8Array([1, 2, 3]));
+          controller.enqueue(new Uint8Array([4, 5, 6]));
           controller.close();
         },
       });
-      return new Response(stream, {
-        status: 200,
-        headers: { "content-length": "3" },
-      });
+      return new Response(stream, { status: 200, headers: { "content-length": "6" } });
     }),
   );
-  const progress: number[] = [];
-  await downloadVariant("https://video.twimg.com/v.mp4", "f.mp4", (p) => progress.push(p.received));
-  expect(calls[0]).toBe("https://video.twimg.com/v.mp4");
-  expect(calls[1]).toContain("/api/proxy?");
-  expect(progress.at(-1)).toBe(3);
+  const progress: Array<{ received: number; total: number | null }> = [];
+  await downloadVariant("https://video.twimg.com/v.mp4?tag=1", "f.mp4", (p) => progress.push(p));
+  expect(calls).toHaveLength(1);
+  expect(calls[0]).toContain("/api/proxy?");
+  expect(calls[0]).toContain(encodeURIComponent("https://video.twimg.com/v.mp4?tag=1"));
+  expect(progress.map((p) => p.received)).toEqual([3, 6]);
+  expect(progress.at(-1)?.total).toBe(6);
+});
+
+test("throws when the proxy download fails", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 502 })));
+  await expect(
+    downloadVariant("https://video.twimg.com/v.mp4", "f.mp4", () => {}),
+  ).rejects.toThrow();
 });

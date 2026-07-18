@@ -124,7 +124,7 @@ export default function App() {
               animate={{ y: 0 }}
               transition={{ duration: 0.9, ease: EASE_OUT }}
             >
-              Twitter Video
+              Twitter/X Video
             </motion.span>
           </span>{" "}
           <span className="word grey small">

@@ -42,17 +42,19 @@ function saveBlob(blob: Blob, filename: string): void {
   setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
 }
 
-/** Direct CDN blob download with progress; transparently falls back to the server proxy. */
+/**
+ * Download a variant through the server proxy with streaming progress.
+ *
+ * We cannot fetch video.twimg.com directly from the browser: it responds 403
+ * with no Access-Control-Allow-Origin, so a cross-origin fetch reads zero bytes.
+ * The proxy re-streams the file (setting Content-Length), which is the only way
+ * to read the bytes for an in-page progress bar and to save with a clean name.
+ */
 export async function downloadVariant(
   url: string,
   filename: string,
   onProgress: (p: Progress) => void,
 ): Promise<void> {
-  let blob: Blob;
-  try {
-    blob = await fetchBlob(url, onProgress);
-  } catch {
-    blob = await fetchBlob(proxyUrl(url, filename), onProgress);
-  }
+  const blob = await fetchBlob(proxyUrl(url, filename), onProgress);
   saveBlob(blob, filename);
 }

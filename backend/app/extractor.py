@@ -2,10 +2,11 @@
 
 Twitter closed anonymous/guest video access, so yt-dlp can no longer read video
 without a logged-in account's cookies. The fxtwitter API (api.fxtwitter.com) needs
-no auth and returns video.twimg.com URLs, so the browser still downloads straight
-from Twitter's CDN. vxtwitter is a lower-fidelity fallback (single quality) used
-only when fxtwitter has a transport/upstream failure. When extraction breaks, the
-fix is usually a FixTweet-side change, not ours; see CONTRIBUTING.
+no auth and returns video.twimg.com URLs. The browser cannot fetch those URLs
+directly (the CDN 403s cross-origin reads with no CORS headers), so the frontend
+downloads them through /api/proxy. vxtwitter is a lower-fidelity fallback (single
+quality) used only when fxtwitter has a transport/upstream failure. When extraction
+breaks, the fix is usually a FixTweet-side change, not ours; see CONTRIBUTING.
 """
 import logging
 import re

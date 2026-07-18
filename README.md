@@ -17,8 +17,10 @@ pick a quality, download. No popups, no redirects, no fake download buttons, no 
 
 Every existing Twitter video downloader is buried in popunders and fake buttons.
 SaveVid AI is the opposite: open source, one passive ad slot at most (off by default),
-and the download is never gated or delayed. The video streams straight from Twitter's
-CDN to your browser; this server only resolves links.
+and the download is never gated or delayed. Tweet metadata is resolved via the FixTweet
+API; the video itself is streamed through a locked-down proxy (Twitter's CDN refuses
+cross-origin browser reads), which is what makes the in-page progress bar and clean
+filenames possible.
 
 ## Features
 
