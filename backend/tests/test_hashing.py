@@ -1,4 +1,8 @@
-from app.analytics.hashing import visitor_hash
+import hashlib
+import hmac
+import re
+
+from app.analytics.hashing import today_utc, visitor_hash
 
 SALT = "random-salt"
 
@@ -30,3 +34,17 @@ def test_salt_changes_output():
 def test_never_contains_ip():
     h = visitor_hash(SALT, "203.0.113.77", "2026-07-17")
     assert "203.0.113.77" not in h
+
+
+def test_matches_known_hmac():
+    # Golden value pinning the exact HMAC construction. A bare sha256 concat
+    # (or any other keying/message change) produces a different value and fails.
+    salt, ip, day = "s3cr3t", "1.2.3.4", "2026-07-17"
+    expected = hmac.new(
+        salt.encode(), f"{day}|{ip}".encode(), hashlib.sha256
+    ).hexdigest()[:16]
+    assert visitor_hash(salt, ip, day) == expected
+
+
+def test_today_utc_format():
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", today_utc())
