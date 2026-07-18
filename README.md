@@ -71,6 +71,26 @@ maps it). Run the smoke test to confirm. See CONTRIBUTING for details.
 There is no client-side analytics. On the VPS, Caddy writes a JSON access log;
 run `goaccess /data/access.log --log-format=CADDY` for visitor counts.
 
+## Analytics (optional, privacy-first)
+
+The hosted site records aggregate usage so the maintainer can see growth and spot extraction breakage. What is stored: per-event timestamp, type (visit/fetch/download), outcome (quality label or error code), a 2-letter country (from Cloudflare, when proxied), and a daily-rotating HMAC hash used to estimate unique visitors. What is not stored: IP addresses, any identifier that survives a day, cookies for visitors, or anything that identifies a person. Events are pruned after 90 days.
+
+Analytics is off by default. It activates only when all of `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `ADMIN_PASSWORD`, and `ANALYTICS_SALT` are set, so self-hosted instances collect nothing unless you deliberately configure them. The admin dashboard lives at `/admin` behind a password.
+
+### Enabling it (hosted)
+
+1. Create a free Turso DB: `turso db create savevidai --region aws-us-west-2`, then grab the URL and a token:
+   ```bash
+   turso db show savevidai --url
+   turso db tokens create savevidai
+   ```
+2. Set the four env vars in your hosting platform (Render, etc.):
+   - `TURSO_DATABASE_URL`: your Turso connection string
+   - `TURSO_AUTH_TOKEN`: your Turso auth token
+   - `ADMIN_PASSWORD`: a long random value (it doubles as session-signing key material; use at least 32 random characters)
+   - `ANALYTICS_SALT`: another long random value (used to salt the visitor hash; use at least 32 random characters)
+3. Optional: proxy your domain through Cloudflare (orange cloud) to enable country data collection via the `CF-IPCountry` header.
+
 ## License
 
 MIT

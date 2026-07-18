@@ -37,3 +37,9 @@ transforms/opacity only and respect `prefers-reduced-motion`.
 - Nothing may ever gate, delay, or interrupt a download (no countdown, no ad-unlock).
 - No client-side tracking of any kind.
 - Error messages stay specific and honest.
+
+## Analytics rules
+
+- Never store a raw IP, a cross-day identifier, or a visitor cookie. Visitor counting uses only the daily-rotating HMAC hash in `app/analytics/hashing.py`.
+- Recording is fire-and-forget: it must never block or fail a user request.
+- Any new event field must be aggregate and non-identifying.
