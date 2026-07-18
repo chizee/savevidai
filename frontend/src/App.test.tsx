@@ -1,3 +1,4 @@
+import { StrictMode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
@@ -10,6 +11,25 @@ const BODY = {
   items: [{ index: 1, kind: "video", thumbnail: null, duration_seconds: 3,
     variants: [{ label: "720p", width: 1280, height: 720, url: "https://video.twimg.com/v.mp4", size_bytes: 100 }] }],
 };
+
+test("fires exactly one visit beacon per page load, even with StrictMode's double-invoke", async () => {
+  const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+    new Response(null, { status: 204 }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+  await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+  const visitCalls = fetchMock.mock.calls.filter(([url, init]) => {
+    if (String(url) !== "/api/event") return false;
+    const body = JSON.parse(String((init as RequestInit).body));
+    return body.type === "visit";
+  });
+  expect(visitCalls).toHaveLength(1);
+});
 
 test("paste-to-card flow scrolls to the result and confirms on the button", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(BODY), { status: 200 })));
@@ -27,13 +47,17 @@ test("paste-to-card flow scrolls to the result and confirms on the button", asyn
 });
 
 test("example chip resolves the showcase tweet and fills the input", async () => {
-  const fetchMock = vi.fn(async () => new Response(JSON.stringify(BODY), { status: 200 }));
+  const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+    new Response(JSON.stringify(BODY), { status: 200 }),
+  );
   vi.stubGlobal("fetch", fetchMock);
   render(<App />);
   await userEvent.click(screen.getByRole("button", { name: /try an example/i }));
   expect(await screen.findByTestId("preview-card")).toBeInTheDocument();
-  const call = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-  expect(String(call[1].body)).toContain("/israfill/status/2077383034639094193");
+  // Filter to the resolve call specifically: a visit beacon may also hit fetch
+  // on mount, so the resolve request isn't guaranteed to be the first call.
+  const call = fetchMock.mock.calls.find(([url]) => String(url) === "/api/resolve");
+  expect(String(call?.[1]?.body)).toContain("/israfill/status/2077383034639094193");
   expect(screen.getByRole("textbox")).toHaveValue(
     "https://x.com/israfill/status/2077383034639094193",
   );

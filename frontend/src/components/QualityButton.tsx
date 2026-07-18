@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "motion/react";
+import { sendEvent } from "../lib/analytics";
 import type { Variant } from "../lib/api";
 import { downloadVariant, type Progress } from "../lib/download";
 import { formatBytes } from "../lib/format";
@@ -30,6 +31,7 @@ export function QualityButton({
   async function start() {
     if (phase.name === "downloading") return;
     setPhase({ name: "downloading", progress: { received: 0, total: variant.size_bytes } });
+    sendEvent("download", variant.label);
     try {
       await downloadVariant(variant.url, filename, (progress) =>
         setPhase({ name: "downloading", progress }),

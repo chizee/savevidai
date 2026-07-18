@@ -7,10 +7,16 @@ import { PreviewCard } from "./components/PreviewCard";
 import { SkeletonCard } from "./components/SkeletonCard";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { useResolve } from "./hooks/useResolve";
+import { sendEvent } from "./lib/analytics";
 import { EASE_OUT, fadeRise } from "./lib/motion";
 
 // The maker's own video post, used as the one-click live demo.
 const EXAMPLE_URL = "https://x.com/israfill/status/2077383034639094193";
+
+// Module-level (not component-level) so it survives React StrictMode's dev-time
+// double-invoke of effects and any remounts, guaranteeing one visit beacon per
+// page load rather than per mount.
+let visitBeaconSent = false;
 
 export default function App() {
   const { state, resolve } = useResolve();
@@ -23,6 +29,14 @@ export default function App() {
   }
 
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  // Anonymous visit beacon, once per page load (module-level flag above guards
+  // against StrictMode's double-invoke and any re-renders/remounts).
+  useEffect(() => {
+    if (visitBeaconSent) return;
+    visitBeaconSent = true;
+    sendEvent("visit");
+  }, []);
 
   // When a fetch lands, bring the preview card in front of the user's eyes.
   useEffect(() => {
