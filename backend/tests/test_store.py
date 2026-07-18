@@ -1,4 +1,6 @@
-from app.analytics.store import SqliteStore
+import pytest
+
+from app.analytics.store import SqliteStore, _raise_on_pipeline_errors
 
 
 def test_schema_and_roundtrip():
@@ -27,3 +29,22 @@ def test_query_with_args():
     ])
     rows = s.query("SELECT COUNT(*) AS n FROM events WHERE type = ?", ["fetch"])
     assert rows[0]["n"] == 1
+
+
+def test_raise_on_pipeline_errors_raises():
+    results = [
+        {"type": "ok", "response": {}},
+        {"type": "error", "error": {"message": "no such table: events"}},
+    ]
+    with pytest.raises(RuntimeError, match="no such table: events"):
+        _raise_on_pipeline_errors(results)
+
+
+def test_raise_on_pipeline_errors_missing_message():
+    with pytest.raises(RuntimeError, match="unknown Turso error"):
+        _raise_on_pipeline_errors([{"type": "error"}])
+
+
+def test_raise_on_pipeline_errors_success_no_raise():
+    results = [{"type": "ok", "response": {}}, {"type": "ok", "response": {}}]
+    _raise_on_pipeline_errors(results)

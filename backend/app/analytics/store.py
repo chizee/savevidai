@@ -54,9 +54,18 @@ class SqliteStore:
 def _turso_arg(value: Any) -> dict:
     if value is None:
         return {"type": "null", "value": None}
+    if isinstance(value, bool):
+        return {"type": "integer", "value": str(int(value))}
     if isinstance(value, int):
         return {"type": "integer", "value": str(value)}
     return {"type": "text", "value": str(value)}
+
+
+def _raise_on_pipeline_errors(results: list) -> None:
+    for item in results:
+        if isinstance(item, dict) and item.get("type") == "error":
+            msg = (item.get("error") or {}).get("message", "unknown Turso error")
+            raise RuntimeError(f"Turso statement failed: {msg}")
 
 
 class TursoStore:
@@ -76,7 +85,9 @@ class TursoStore:
         resp = httpx.post(self._endpoint, headers=self._headers,
                           json={"requests": requests}, timeout=15.0)
         resp.raise_for_status()
-        return resp.json()["results"]
+        results = resp.json()["results"]
+        _raise_on_pipeline_errors(results)
+        return results
 
     def init_schema(self) -> None:
         self._pipeline([(stmt, []) for stmt in SCHEMA])
