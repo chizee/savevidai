@@ -1,3 +1,5 @@
+import threading
+
 from app.analytics.recorder import Recorder
 from app.analytics.store import SqliteStore
 
@@ -6,6 +8,28 @@ def _store():
     s = SqliteStore(":memory:")
     s.init_schema()
     return s
+
+
+class FlakyStore:
+    """Fake Store whose execute_many raises the first N times, then records
+    every subsequent batch. Lets us assert flush() swallows failures."""
+
+    def __init__(self, fail_times: int = 1):
+        self._fail_times = fail_times
+        self.calls = 0
+        self.batches: list[list[tuple[str, list]]] = []
+
+    def init_schema(self) -> None:  # pragma: no cover - unused
+        pass
+
+    def execute_many(self, statements: list[tuple[str, list]]) -> None:
+        self.calls += 1
+        if self.calls <= self._fail_times:
+            raise RuntimeError("store unavailable")
+        self.batches.append(statements)
+
+    def query(self, sql: str, args: list) -> list[dict]:  # pragma: no cover - unused
+        return []
 
 
 def test_record_then_flush_writes_rows():
@@ -50,3 +74,70 @@ def test_prune_removes_old_events():
     Recorder(s, prune_days=90).prune()
     rows = s.query("SELECT visitor FROM events", [])
     assert [r["visitor"] for r in rows] == ["new"]
+
+
+def test_flush_swallows_store_failure_then_recovers():
+    store = FlakyStore(fail_times=1)
+    rec = Recorder(store)
+    rec.record("visit", visitor="v1")
+    # First flush: store raises. flush() must swallow it, return 0, not propagate.
+    assert rec.flush() == 0
+    # The queue was drained on the failed flush, so those events are lost (logged).
+    assert store.batches == []
+    # A subsequent flush with a now-working store still writes new events.
+    rec.record("visit", visitor="v2")
+    assert rec.flush() == 1
+    assert len(store.batches) == 1
+    # Each statement is (_INSERT, [ts, type, outcome, country, visitor]); visitor is last.
+    assert store.batches[0][0][1][-1] == "v2"
+
+
+def test_stop_flushes_remaining_events():
+    s = _store()
+    rec = Recorder(s, batch_interval=60.0)  # long interval so only stop() flushes
+    rec.record("visit", visitor="a")
+    rec.record("visit", visitor="b")
+    rec.start()
+    rec.stop()  # stop() must trigger a final synchronous flush
+    rows = s.query("SELECT visitor FROM events ORDER BY id", [])
+    assert [r["visitor"] for r in rows] == ["a", "b"]
+
+
+def test_concurrent_record_respects_bound():
+    s = _store()
+    n_threads = 8
+    per_thread = 500
+    total = n_threads * per_thread
+    cap = total  # large enough to hold everything, so nothing should drop
+    rec = Recorder(s, max_queue=cap)
+
+    # Track the max queue length observed during recording to prove the bound holds.
+    observed_max = 0
+    observed_lock = threading.Lock()
+    start = threading.Event()
+
+    def worker(tid: int) -> None:
+        nonlocal observed_max
+        start.wait()
+        for i in range(per_thread):
+            rec.record("visit", visitor=f"t{tid}-{i}")
+            with rec._lock:
+                cur = len(rec._q)
+            with observed_lock:
+                if cur > observed_max:
+                    observed_max = cur
+
+    threads = [threading.Thread(target=worker, args=(t,)) for t in range(n_threads)]
+    for t in threads:
+        t.start()
+    start.set()
+    for t in threads:
+        t.join()
+
+    enqueued = len(rec._q)
+    assert enqueued + rec.dropped == total
+    assert observed_max <= cap
+    assert enqueued <= cap
+    # With a cap == total and no concurrent flush, nothing should have dropped.
+    assert rec.dropped == 0
+    assert enqueued == total

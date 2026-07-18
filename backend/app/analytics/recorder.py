@@ -30,12 +30,17 @@ class Recorder:
     def record(self, type: str, visitor: str, outcome: str | None = None,
                country: str | None = None) -> None:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        dropped = False
         with self._lock:
             if len(self._q) >= self._max:
                 self._q.popleft()
                 self.dropped += 1
-                logger.warning("analytics queue full, dropped oldest event")
+                dropped = True
             self._q.append((ts, type, outcome, country, visitor))
+        # Log outside the lock: logging can do slow I/O and must never block
+        # record() while holding the lock that flush() also needs.
+        if dropped:
+            logger.warning("analytics queue full, dropped oldest event")
 
     def flush(self) -> int:
         with self._lock:
