@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 
@@ -14,6 +15,8 @@ from .analytics.router import router as analytics_router
 from .analytics.store import make_store
 from .errors import AppError
 from .limits import limiter
+
+logger = logging.getLogger("savevidai.analytics")
 
 
 @asynccontextmanager
@@ -48,10 +51,18 @@ def create_app() -> FastAPI:
     app.include_router(resolve.router)
     app.include_router(proxy.router)
 
-    cfg = load_config(os.environ)
-    if cfg is not None:
-        store = make_store(cfg)
-        analytics_service.service.init(cfg, store, Recorder(store))
+    # Analytics enablement must never be able to take the public site down.
+    # cfg load, store construction, init_schema, and recorder start are all
+    # covered: if Turso is unreachable, the token is stale, or a statement
+    # errors, leave analytics disabled for this process and keep booting.
+    # It self-heals on the next restart.
+    try:
+        cfg = load_config(os.environ)
+        if cfg is not None:
+            store = make_store(cfg)
+            analytics_service.service.init(cfg, store, Recorder(store))
+    except Exception as exc:
+        logger.warning("analytics disabled: init failed: %r", exc)
     app.include_router(analytics_router)
 
     # Serves the built frontend in the Docker image; absent in dev, where Vite serves it.
