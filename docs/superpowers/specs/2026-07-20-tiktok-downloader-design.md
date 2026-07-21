@@ -5,13 +5,19 @@ Status: Approved pending user review
 
 ## What
 
-Add TikTok (no-watermark) video download to SaveVid AI alongside the existing Twitter/X support. The home paste box accepts both platforms and auto-routes; a dedicated `/tiktok` page targets the "tiktok video downloader" search term. YouTube and a broader everything-downloader are explicitly out of scope (a separate future site).
+Add TikTok (no-watermark) video download to SaveVid AI as its OWN dedicated page, not mixed into the home page. Each platform gets a separate, keyword-rich page:
+
+- Twitter/X: home (`/`), unchanged.
+- TikTok: `/tiktokvideodownloader` (this build).
+- Reddit: `/redditvideodownloader` (fast-follow, same pattern, separate spec/build).
+
+Platforms are never mixed in one paste box. Instead, a prominent row of platform links sits under the hero (the empty area above the how-to graphic) plus compact links in the top nav, so visitors can jump straight to the page for their platform. This build ships TikTok; the page pattern and the platform-links component are built to make Reddit and future platforms drop-in. YouTube and a broader everything-downloader remain out of scope (a separate future site).
 
 ## Goals
 
 - Paste a TikTok post link, get the no-watermark video in a few seconds, same UX as X.
 - Keep the resolve-then-proxy model and near-zero cost (no yt-dlp, no ffmpeg, no residential proxies).
-- Protect the home page's existing "Twitter Video Downloader" ranking; `/tiktok` owns the TikTok term.
+- Protect the home page's existing "Twitter Video Downloader" ranking; `/tiktokvideodownloader` owns the TikTok term.
 - Per-platform analytics so the owner can see X vs TikTok usage.
 - Do not weaken the proxy's SSRF lock.
 
@@ -64,16 +70,21 @@ The resolve cache key must be namespaced by platform (`f"{platform}:{id_or_urlke
 ## Analytics (per-platform)
 
 - Add a nullable `platform` column to the `events` table (`twitter` | `tiktok` | null for legacy rows). `CREATE TABLE IF NOT EXISTS` stays; add a lightweight migration that `ALTER TABLE ADD COLUMN platform` if missing (both SqliteStore and TursoStore), guarded so it is idempotent and never crashes boot (the non-fatal enablement wrapper already protects startup).
-- `fetch` and `download` events record their platform. `visit` events carry the page (`home` | `tiktok`) as the platform value or null.
+- `fetch` and `download` events record their resolved platform (`twitter` | `tiktok`). `visit` events record the page's platform (`twitter` for `/`, `tiktok` for `/tiktokvideodownloader`).
 - Stats API gains a `platforms` breakdown (fetches/downloads by platform, window-scoped). Dashboard adds one small bar/row showing X vs TikTok.
 - **Download-event validation fix:** the `/api/event` quality pattern is currently `^\d{2,4}p$|^video$` and would 422 the TikTok labels. Widen it to exactly `^(\d{2,4}p|video|hd|sd)$`. This is required or TikTok download beacons are silently dropped.
 
 ## Frontend
 
-- Home: paste box already sends a URL to `/api/resolve`, which now auto-detects platform, so functionally it accepts TikTok with no change. H1 stays "Twitter/X Video Downloader" (protect the ranking). Add a small, honest capability signal near the input (e.g. an "X · TikTok" chip), not an H1 rewrite.
-- `/tiktok` page: new Vite entry (same multi-page pattern as `/admin`), served by FastAPI at `GET /tiktok`. Reuses the exact tool and design system. Its own SEO head: title "TikTok Video Downloader - No Watermark, Free | SaveVid AI", TikTok-specific meta, and genuinely distinct static content (TikTok how-to, TikTok FAQ, "no watermark" explainer) so it is not thin/duplicate. Defaults the tool's context to TikTok (placeholder, examples).
-- `sitemap.xml` gains `/tiktok`. `robots.txt` unchanged.
-- The `/tiktok` page's static content must be crawlable HTML (same approach as the home landing sections).
+Dedicated page per platform, no mixed input. Each page is a Vite entry (same multi-page pattern as `/admin`), served by FastAPI, reusing the same tool and design system, scoped to one platform (placeholder, examples, SEO, brand copy).
+
+- **Home (`/`)**: unchanged, Twitter/X only. H1 stays "Twitter/X Video Downloader" (protects the ranking). Its paste box stays Twitter-only in presentation.
+- **TikTok page (`/tiktokvideodownloader`)**: served at `GET /tiktokvideodownloader`. Own SEO head: title "TikTok Video Downloader - No Watermark, Free | SaveVid AI", TikTok-specific meta, and genuinely distinct crawlable static content (TikTok how-to, TikTok FAQ, no-watermark explainer) so it is not thin/duplicate. Paste box placeholder + example are TikTok.
+- **Platform-links component (discoverability, the key UX ask)**: a row of cards/pills, one per platform (Twitter/X, TikTok, and Reddit once it ships), rendered on every platform page in the space directly under the hero caption and above the how-to graphic (the area the owner marked). The card for the current page is shown as active; the others link to their pages. This is how visitors find the right downloader. Adding a platform later = one entry in this component, no redesign.
+- **Top nav**: add compact links to the platform pages (Twitter / TikTok / Reddit) alongside the existing nav, so the pages are reachable from the header too.
+- Backend stays forgiving: `/api/resolve` still auto-detects platform from the pasted URL, so a mis-pasted link (e.g. a TikTok URL on the home page) still resolves rather than hard-failing. The separation is a presentation/SEO choice, not a backend restriction. Each page may show a gentle hint if the pasted link is for a different platform ("that's a TikTok link, here's the TikTok page").
+- URL slugs are the exact keyword phrases (`tiktokvideodownloader`, later `redditvideodownloader`). Hyphenated variants (`tiktok-video-downloader`) read marginally better for SEO; going with the owner's no-hyphen preference unless changed.
+- `sitemap.xml` gains `/tiktokvideodownloader` (and `/redditvideodownloader` when built). `robots.txt` unchanged. Public bundle for `/` must stay unaffected (separate entry chunks, as verified for `/admin`).
 
 ## Error handling
 
@@ -90,11 +101,11 @@ The resolve cache key must be namespaced by platform (`f"{platform}:{id_or_urlke
 - Proxy allowlist: accepts the TikTok byte host(s), still rejects `video.twimg.com.evil.com`, non-allowed hosts, and control-char URLs (existing regression holds).
 - Cache namespacing: a tiktok id and a twitter id with the same digits do not collide.
 - Analytics: `platform` recorded on fetch/download; migration idempotent; widened quality validation accepts TikTok labels and still rejects junk; stats `platforms` breakdown correct on a seeded fixture.
-- Frontend: `/tiktok` entry builds, public bundle unaffected, tool resolves a TikTok URL (mocked), home box accepts a TikTok URL.
+- Frontend: `/tiktokvideodownloader` entry builds and the home (`/`) bundle is unaffected; the TikTok page resolves a TikTok URL (mocked); the platform-links component renders on each page with the current platform active and the others linking out; backend `/api/resolve` still auto-detects a TikTok URL regardless of page (forgiving).
 
 ## Risks
 
 - Free TikTok resolver is a third-party single point of failure, and (unlike Twitter) the download bytes may depend on it too. Mitigation: fallback-resolver slot, in-memory cache, honest error messages.
 - Resolver rate limits (tikwm-style services are stricter than fxtwitter). Cache absorbs popular items; note as a scaling watch-item.
 - Proxy allowlist is the SSRF-critical surface; the plan pins exact hosts and uses suffix-safe matching, no substring, no redirect-follow.
-- `/tiktok` thin-content SEO risk: mitigated by genuinely distinct TikTok copy.
+- `/tiktokvideodownloader` thin-content SEO risk: mitigated by genuinely distinct TikTok copy.
