@@ -155,6 +155,7 @@ export default function TikTokApp() {
             errorMessage={state.status === "error" ? state.message : null}
             onSubmit={resolve}
             placeholder="Paste a TikTok video link"
+            ariaLabel="TikTok video link"
           />
         </motion.div>
 

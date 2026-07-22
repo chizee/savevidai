@@ -9,6 +9,8 @@ type Props = {
   presetValue?: string | null;
   /** Field placeholder; defaults to the Twitter/X copy for the home page. */
   placeholder?: string;
+  /** Accessible name for the field; defaults to the home page's Twitter/X copy. */
+  ariaLabel?: string;
 };
 
 export function PasteInput({
@@ -17,6 +19,7 @@ export function PasteInput({
   onSubmit,
   presetValue = null,
   placeholder = "Paste a Twitter/X post link",
+  ariaLabel = "Twitter/X post link",
 }: Props) {
   const [value, setValue] = useState("");
   const [justFetched, setJustFetched] = useState(false);
@@ -62,7 +65,7 @@ export function PasteInput({
           onChange={(e) => setValue(e.target.value)}
           onFocus={prefillFromClipboard}
           placeholder={placeholder}
-          aria-label={placeholder}
+          aria-label={ariaLabel}
           spellCheck={false}
           autoComplete="off"
           className={`cta-input ${status === "error" ? "animate-shake" : ""}`}

@@ -20,3 +20,15 @@ test("shows error message with alert role", () => {
   render(<PasteInput status="error" errorMessage="This post doesn't exist or was deleted." onSubmit={vi.fn()} />);
   expect(screen.getByRole("alert")).toHaveTextContent("doesn't exist");
 });
+
+test("defaults the accessible name to the Twitter/X home copy", () => {
+  render(<PasteInput status="idle" errorMessage={null} onSubmit={vi.fn()} />);
+  expect(screen.getByRole("textbox")).toHaveAccessibleName("Twitter/X post link");
+});
+
+test("uses the provided aria-label for the tiktok page", () => {
+  render(
+    <PasteInput status="idle" errorMessage={null} onSubmit={vi.fn()} ariaLabel="TikTok video link" />,
+  );
+  expect(screen.getByRole("textbox")).toHaveAccessibleName("TikTok video link");
+});
