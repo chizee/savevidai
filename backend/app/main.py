@@ -65,6 +65,17 @@ def create_app() -> FastAPI:
         logger.warning("analytics disabled: init failed: %r", exc)
     app.include_router(analytics_router)
 
+    @app.get("/tiktokvideodownloader")
+    def tiktok_page():
+        from fastapi import HTTPException
+        from fastapi.responses import FileResponse
+
+        sd = os.environ.get("STATIC_DIR", "")
+        path = os.path.join(sd, "tiktokvideodownloader.html")
+        if sd and os.path.isfile(path):
+            return FileResponse(path)
+        raise HTTPException(status_code=404)
+
     # Serves the built frontend in the Docker image; absent in dev, where Vite serves it.
     static_dir = os.environ.get("STATIC_DIR", "")
     if static_dir and os.path.isdir(static_dir):

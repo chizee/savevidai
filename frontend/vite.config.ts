@@ -14,6 +14,7 @@ export default defineConfig({
       input: {
         main: entry("./index.html"),
         admin: entry("./admin.html"),
+        tiktok: entry("./tiktokvideodownloader.html"),
       },
     },
   },

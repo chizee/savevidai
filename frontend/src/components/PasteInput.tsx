@@ -7,9 +7,17 @@ type Props = {
   onSubmit: (url: string) => void;
   /** Externally injected URL (e.g. the example chip); mirrored into the field. */
   presetValue?: string | null;
+  /** Field placeholder; defaults to the Twitter/X copy for the home page. */
+  placeholder?: string;
 };
 
-export function PasteInput({ status, errorMessage, onSubmit, presetValue = null }: Props) {
+export function PasteInput({
+  status,
+  errorMessage,
+  onSubmit,
+  presetValue = null,
+  placeholder = "Paste a Twitter/X post link",
+}: Props) {
   const [value, setValue] = useState("");
   const [justFetched, setJustFetched] = useState(false);
   const busy = status === "resolving";
@@ -39,7 +47,7 @@ export function PasteInput({ status, errorMessage, onSubmit, presetValue = null 
     if (value) return;
     try {
       const text = await navigator.clipboard.readText();
-      if (text.includes("/status/")) setValue(text.trim());
+      if (text.includes("/status/") || text.includes("tiktok")) setValue(text.trim());
     } catch {
       // clipboard permission denied or unavailable; typing still works
     }
@@ -53,8 +61,8 @@ export function PasteInput({ status, errorMessage, onSubmit, presetValue = null 
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onFocus={prefillFromClipboard}
-          placeholder="Paste a Twitter/X post link"
-          aria-label="Twitter/X post link"
+          placeholder={placeholder}
+          aria-label={placeholder}
           spellCheck={false}
           autoComplete="off"
           className={`cta-input ${status === "error" ? "animate-shake" : ""}`}
