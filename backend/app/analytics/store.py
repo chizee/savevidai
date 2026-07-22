@@ -11,11 +11,17 @@ SCHEMA: list[str] = [
         type    TEXT NOT NULL,
         outcome TEXT,
         country TEXT,
-        visitor TEXT NOT NULL
+        visitor TEXT NOT NULL,
+        platform TEXT
     )""",
     "CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts)",
     "CREATE INDEX IF NOT EXISTS idx_events_type_ts ON events(type, ts)",
 ]
+
+
+def _ensure_platform_column(existing_cols: set[str]) -> list[str]:
+    """Return the ALTER statements needed to add the platform column, or []."""
+    return [] if "platform" in existing_cols else ["ALTER TABLE events ADD COLUMN platform TEXT"]
 
 
 class Store(Protocol):
@@ -36,6 +42,9 @@ class SqliteStore:
     def init_schema(self) -> None:
         with self._lock:
             for stmt in SCHEMA:
+                self._conn.execute(stmt)
+            cols = {r[1] for r in self._conn.execute("PRAGMA table_info(events)")}
+            for stmt in _ensure_platform_column(cols):
                 self._conn.execute(stmt)
             self._conn.commit()
 
@@ -91,6 +100,10 @@ class TursoStore:
 
     def init_schema(self) -> None:
         self._pipeline([(stmt, []) for stmt in SCHEMA])
+        cols = {r["name"] for r in self.query("PRAGMA table_info(events)", [])}
+        migration = _ensure_platform_column(cols)
+        if migration:
+            self._pipeline([(stmt, []) for stmt in migration])
 
     def execute_many(self, statements: list[tuple[str, list]]) -> None:
         self._pipeline(statements)

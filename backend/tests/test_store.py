@@ -48,3 +48,16 @@ def test_raise_on_pipeline_errors_missing_message():
 def test_raise_on_pipeline_errors_success_no_raise():
     results = [{"type": "ok", "response": {}}, {"type": "ok", "response": {}}]
     _raise_on_pipeline_errors(results)
+
+
+def test_platform_column_present_and_idempotent():
+    from app.analytics.store import SqliteStore
+    s = SqliteStore(":memory:")
+    s.init_schema()
+    s.init_schema()  # second call must not raise (migration idempotent)
+    s.execute_many([(
+        "INSERT INTO events (ts, type, outcome, country, visitor, platform) VALUES (?,?,?,?,?,?)",
+        ["2026-07-20 10:00:00", "fetch", "ok", None, "vh", "tiktok"],
+    )])
+    rows = s.query("SELECT platform FROM events", [])
+    assert rows[0]["platform"] == "tiktok"
