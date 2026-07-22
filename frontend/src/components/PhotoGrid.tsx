@@ -52,7 +52,9 @@ export function PhotoGrid({
   }
 
   async function onPhotoClick(i: number) {
-    if (states[i] === "saving") return;
+    // Ignore tile taps while a Save all sweep is in flight so a photo isn't
+    // downloaded (and beaconed) twice.
+    if (savingAll || states[i] === "saving") return;
     sendEvent("download", { quality: "photo", platform });
     await savePhoto(i);
   }
@@ -103,7 +105,11 @@ export function PhotoGrid({
             data-state={soundState}
             className="quality-btn font-semibold"
           >
-            {soundState === "saved" ? "Sound saved" : "Sound"}
+            {soundState === "saved"
+              ? "Sound saved"
+              : soundState === "failed"
+                ? "Retry sound"
+                : "Sound"}
           </button>
         )}
       </motion.div>
