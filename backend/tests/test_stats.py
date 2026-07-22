@@ -184,3 +184,21 @@ def test_compute_stats_nonzero_tz_window_not_truncated_and_hour_shift():
 
     hours_by_hour = {row["hour"]: row["count"] for row in stats["hours"]}
     assert hours_by_hour.get(4) == expected_hour4_count
+
+
+def test_stats_platforms_breakdown():
+    from app.analytics.stats import compute_stats
+    from app.analytics.store import SqliteStore
+    s = SqliteStore(":memory:")
+    s.init_schema()
+    rows = [
+        ("2026-07-20 10:00:00", "fetch", "ok", None, "v1", "twitter"),
+        ("2026-07-20 10:01:00", "fetch", "ok", None, "v2", "tiktok"),
+        ("2026-07-20 10:02:00", "download", "hd", None, "v2", "tiktok"),
+    ]
+    s.execute_many([("INSERT INTO events (ts,type,outcome,country,visitor,platform) VALUES (?,?,?,?,?,?)", list(r)) for r in rows])
+    out = compute_stats(s, days=30, tz=0)
+    by = {p["platform"]: p for p in out["platforms"]}
+    assert by["twitter"]["fetches"] == 1
+    assert by["tiktok"]["fetches"] == 1
+    assert by["tiktok"]["downloads"] == 1

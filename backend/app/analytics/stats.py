@@ -126,6 +126,16 @@ def compute_stats(store: Store, days: int, tz: int) -> dict:
         f"FROM events WHERE {window} GROUP BY hour ORDER BY hour", [],
     )
 
+    platform_rows = store.query(
+        f"SELECT platform, "
+        f"SUM(CASE WHEN type='fetch' THEN 1 ELSE 0 END) AS fetches, "
+        f"SUM(CASE WHEN type='download' THEN 1 ELSE 0 END) AS downloads "
+        f"FROM events WHERE {window} AND platform IS NOT NULL "
+        f"GROUP BY platform ORDER BY fetches DESC", [],
+    )
+    platforms = [{"platform": r["platform"], "fetches": r["fetches"] or 0,
+                  "downloads": r["downloads"] or 0} for r in platform_rows]
+
     return {
         "totals": {
             "fetches": fetches,
@@ -141,4 +151,5 @@ def compute_stats(store: Store, days: int, tz: int) -> dict:
         "qualities": qualities,
         "errors": errors,
         "hours": hours,
+        "platforms": platforms,
     }
