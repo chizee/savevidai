@@ -35,3 +35,29 @@ def parse_tweet_url(raw: str) -> str:
     if not match:
         raise InvalidTweetURL(raw)
     return match.group(1)
+
+
+TIKTOK_HOSTS = {
+    "tiktok.com", "www.tiktok.com", "m.tiktok.com",
+    "vm.tiktok.com", "vt.tiktok.com",
+}
+
+
+def parse_tiktok_url(raw: str) -> str:
+    """Validate the host is TikTok and return a normalized https URL.
+
+    Unlike Twitter (which extracts a numeric ID), TikTok's resolver takes the
+    URL directly and follows short links (vm./vt.). We host-allowlist first so
+    an arbitrary user URL is never forwarded to the third-party resolver.
+    """
+    raw = raw.strip()
+    if not raw:
+        raise InvalidTweetURL("empty input")
+    if "://" not in raw:
+        raw = "https://" + raw
+    parsed = urlparse(raw)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise InvalidTweetURL(raw)
+    if parsed.hostname.lower() not in TIKTOK_HOSTS:
+        raise InvalidTweetURL(raw)
+    return raw if raw.startswith("https://") else raw.replace("http://", "https://", 1)

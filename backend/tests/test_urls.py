@@ -1,6 +1,6 @@
 import pytest
 
-from app.urls import InvalidTweetURL, parse_tweet_url
+from app.urls import InvalidTweetURL, parse_tiktok_url, parse_tweet_url
 
 VALID = [
     ("https://twitter.com/jack/status/20", "20"),
@@ -42,3 +42,35 @@ def test_valid_urls(url, expected):
 def test_invalid_urls(url):
     with pytest.raises(InvalidTweetURL):
         parse_tweet_url(url)
+
+
+TIKTOK_VALID = [
+    "https://www.tiktok.com/@user/video/7280000000000000000",
+    "https://tiktok.com/@user/video/7280000000000000000?is_from_webapp=1",
+    "https://m.tiktok.com/v/7280000000000000000.html",
+    "https://vm.tiktok.com/ZMabcдef/",  # short link, host-validated, resolver follows it
+    "https://vt.tiktok.com/ZSabc123/",
+    "tiktok.com/@user/video/7280000000000000000",  # scheme added
+    "  https://www.tiktok.com/@user/video/7280000000000000000  ",
+]
+TIKTOK_INVALID = [
+    "",
+    "https://youtube.com/watch?v=abc",
+    "https://tiktok.com.evil.com/@user/video/1",
+    "https://eviltiktok.com/@user/video/1",
+    "ftp://tiktok.com/@user/video/1",
+    "https://x.com/jack/status/20",  # a tweet is not a TikTok
+]
+
+
+@pytest.mark.parametrize("url", TIKTOK_VALID)
+def test_parse_tiktok_valid(url):
+    out = parse_tiktok_url(url)
+    assert out.startswith("https://")
+    assert "tiktok.com" in out
+
+
+@pytest.mark.parametrize("url", TIKTOK_INVALID)
+def test_parse_tiktok_invalid(url):
+    with pytest.raises(InvalidTweetURL):
+        parse_tiktok_url(url)
