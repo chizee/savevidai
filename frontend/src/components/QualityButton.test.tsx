@@ -74,3 +74,15 @@ test("download beacon failure does not block or alter the download", async () =>
   await userEvent.click(screen.getByRole("button"));
   expect(await screen.findByText("Saved")).toBeInTheDocument();
 });
+
+test("hd label without dimensions still gets the HD chip", () => {
+  render(
+    <QualityButton
+      variant={{ label: "hd", width: null, height: null, url: "https://v16m.tiktokcdn-us.com/x.mp4", size_bytes: 1000 }}
+      filename="user_1_hd.mp4"
+      platform="tiktok"
+    />,
+  );
+  expect(screen.getByText("HD")).toBeInTheDocument();
+  expect(screen.getByText("hd")).toBeInTheDocument();
+});

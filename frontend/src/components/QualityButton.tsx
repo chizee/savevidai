@@ -28,7 +28,7 @@ export function QualityButton({
   // label only when the API didn't give dimensions (rare, e.g. some GIFs).
   const dims =
     variant.width && variant.height ? `${variant.width}×${variant.height}` : variant.label;
-  const isHd = (variant.height ?? 0) >= 720;
+  const isHd = (variant.height ?? 0) >= 720 || variant.label === "hd";
 
   async function start() {
     if (phase.name === "downloading") return;
