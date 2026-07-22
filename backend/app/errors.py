@@ -8,7 +8,7 @@ class AppError(Exception):
         self.status = status
 
 
-INVALID_URL = ("invalid_url", "That doesn't look like a Twitter/X post link.", 422)
+INVALID_URL = ("invalid_url", "That doesn't look like a valid video link.", 422)
 NOT_FOUND = ("not_found", "This post doesn't exist or was deleted.", 404)
 NO_VIDEO = (
     "no_video",

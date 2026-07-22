@@ -22,6 +22,8 @@ _UA = "SaveVidAI/1.0 (+https://savevidai.israfill.dev)"
 # TikTok CDNs (v16m*.tiktokcdn-us.com here; plain tiktokcdn.com and
 # tiktokcdn-eu.com exist for other regions), and tikwm sometimes serves bytes
 # itself.
+# NOTE: this tuple feeds the /api/proxy SSRF allowlist, so widening it widens
+# what the proxy will fetch on the server's behalf - change with care.
 TIKTOK_MEDIA_HOSTS = ("tikwm.com", "tiktokcdn.com", "tiktokcdn-us.com", "tiktokcdn-eu.com")
 
 
