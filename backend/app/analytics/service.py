@@ -27,7 +27,8 @@ class AnalyticsService:
     def _visitor(self, request: Request) -> str:
         return visitor_hash(self._cfg.salt, client_ip(request), today_utc())
 
-    def record_from_request(self, request: Request, type: str, outcome: str | None) -> None:
+    def record_from_request(self, request: Request, type: str, outcome: str | None,
+                            platform: str | None = None) -> None:
         if not self.enabled:
             return
         # Fire-and-forget: recording is called inline on request-handling paths
@@ -37,7 +38,8 @@ class AnalyticsService:
             country = request.headers.get("cf-ipcountry") or None
             if country in ("XX", "T1"):  # Cloudflare's unknown/Tor placeholders
                 country = None
-            self._recorder.record(type, visitor=self._visitor(request), outcome=outcome, country=country)
+            self._recorder.record(type, visitor=self._visitor(request), outcome=outcome,
+                                  country=country, platform=platform)
         except Exception:
             logger.warning("analytics record_from_request failed", exc_info=True)
 

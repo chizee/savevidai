@@ -15,7 +15,7 @@ from .stats import compute_stats, parse_tz
 
 router = APIRouter()
 
-_QUALITY_OK = re.compile(r"^\d{2,4}p$|^video$")
+_QUALITY_OK = re.compile(r"^(\d{2,4}p|video|hd|sd)$")
 COOKIE = "svid_admin"
 
 # Carry-forward fix from the Task 4 review: auth.make_cookie/verify_cookie call
@@ -31,6 +31,7 @@ _auth_mod._key = functools.lru_cache(maxsize=4)(_auth_mod._key)
 class EventIn(BaseModel):
     type: str
     quality: str | None = None
+    platform: str | None = None
 
     @field_validator("type")
     @classmethod
@@ -44,6 +45,13 @@ class EventIn(BaseModel):
     def _quality(cls, v):
         if v is not None and not _QUALITY_OK.match(v):
             raise ValueError("bad quality")
+        return v
+
+    @field_validator("platform")
+    @classmethod
+    def _platform(cls, v):
+        if v is not None and v not in ("twitter", "tiktok"):
+            raise ValueError("bad platform")
         return v
 
 
@@ -61,7 +69,7 @@ def _require_enabled() -> None:
 def event(request: Request, payload: EventIn) -> Response:
     _require_enabled()
     outcome = payload.quality if payload.type == "download" else None
-    service.record_from_request(request, payload.type, outcome)
+    service.record_from_request(request, payload.type, outcome, platform=payload.platform)
     return Response(status_code=204)
 
 

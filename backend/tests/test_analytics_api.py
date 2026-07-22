@@ -34,6 +34,24 @@ def test_event_records_download(enabled_client):
     assert rows == [{"type": "download", "outcome": "1080p"}]
 
 
+def test_download_event_accepts_tiktok_labels(enabled_client):
+    client, svc, store = enabled_client
+    for q in ("hd", "sd", "1080p", "video"):
+        r = client.post("/api/event", json={"type": "download", "quality": q, "platform": "tiktok"})
+        assert r.status_code == 204, q
+    assert client.post("/api/event", json={"type": "download", "quality": "junk"}).status_code == 422
+    svc.recorder().flush()
+    rows = store.query("SELECT platform, outcome FROM events WHERE type='download'", [])
+    assert any(r["platform"] == "tiktok" and r["outcome"] == "hd" for r in rows)
+
+
+def test_event_rejects_bad_platform(enabled_client):
+    client, *_ = enabled_client
+    assert client.post(
+        "/api/event", json={"type": "download", "quality": "1080p", "platform": "youtube"}
+    ).status_code == 422
+
+
 def test_event_rejects_bad_type(enabled_client):
     client, *_ = enabled_client
     assert client.post("/api/event", json={"type": "hack"}).status_code == 422
