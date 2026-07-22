@@ -52,3 +52,34 @@ def test_control_char_url_returns_502_without_leaking_semaphore():
     assert res.status_code == 502
     assert res.json()["error"] == "upstream_error"
     assert proxy_module._SEM._value == before  # permit released, no leak
+
+
+def test_proxy_allows_tiktok_host():
+    with respx.mock:
+        respx.get("https://www.tikwm.com/video/media/hdplay/x.mp4").mock(
+            return_value=httpx.Response(200, content=b"vid", headers={"content-length": "3"}))
+        res = client().get(
+            "/api/proxy",
+            params={"url": "https://www.tikwm.com/video/media/hdplay/x.mp4"})
+        assert res.status_code == 200
+        assert res.content == b"vid"
+
+
+def test_proxy_allows_tiktok_cdn_suffix_host():
+    with respx.mock:
+        respx.get("https://v16m-default.tiktokcdn-us.com/some/path/file.mp4").mock(
+            return_value=httpx.Response(200, content=b"cdn", headers={"content-length": "3"}))
+        res = client().get(
+            "/api/proxy",
+            params={"url": "https://v16m-default.tiktokcdn-us.com/some/path/file.mp4"})
+        assert res.status_code == 200
+        assert res.content == b"cdn"
+
+
+def test_proxy_rejects_tiktok_lookalike():
+    res = client().get("/api/proxy", params={"url": "https://tikwm.com.evil.com/x.mp4"})
+    assert res.status_code == 403
+    res2 = client().get("/api/proxy", params={"url": "https://evil.com/x.mp4"})
+    assert res2.status_code == 403
+    res3 = client().get("/api/proxy", params={"url": "https://tiktokcdn-us.com.evil.com/x.mp4"})
+    assert res3.status_code == 403
