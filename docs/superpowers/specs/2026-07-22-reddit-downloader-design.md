@@ -15,13 +15,20 @@ Adds Reddit (videos with audio, GIFs, images, galleries) as a third platform on 
 - No media storage: merged files are per-request temp files, deleted before the request ends. The database (Turso) continues to hold only analytics counters.
 - No YouTube. No quality-bucketing analytics rework (stays on the v2 roadmap; the collapse solves the display problem).
 
-## Verified constraints (probed 2026-07-22)
+## Verified constraints (probed 2026-07-22 and 2026-07-23)
 
-- Anonymous server access to reddit JSON is dead: `403 Blocked` from curl/python on www/old/api.reddit.com even with browser headers, from a residential IP. Datacenter IPs (Render) will be worse. The resolver therefore uses Reddit's official OAuth API (free, 100 QPM, exists for exactly this).
-- Owner action required: create a "script" app at reddit.com/prefs/apps; backend reads `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` env vars (same pattern as analytics env config). Without them, reddit URLs resolve to a clear `not_configured` error; all other platforms unaffected. Self-hosters who skip the vars simply have no Reddit support.
-- `v.redd.it` / `i.redd.it` media bytes are expected to fetch anonymously (CDN). MUST be verified with a real post id during implementation (Task order puts the OAuth client first so ids are obtainable); if the CDN requires headers, the mux/proxy fetches add them.
+- Anonymous server access to reddit JSON is dead: `403 Blocked` on www/old/api/gateway endpoints, browser headers included. Reddit app creation was also blocked for the owner's account (form silently resets), so OAuth is an OPTIONAL upgrade, not the launch path.
+- VERIFIED anonymous launch path (real calls, 2026-07-23, post d8qo81):
+  - `vxreddit.com/<post path>` with a bot User-Agent (`Discordbot/2.0`) returns OG tags: `og:title`, `og:site_name` (`u/<author> on r/<sub> - ...`), `og:type`, and `og:video` whose query params contain `v.redd.it/<vid>/...` stream URLs - the v.redd.it id is extracted from there. Same dependency class as fxtwitter, which the Twitter side already uses.
+  - `https://v.redd.it/<vid>/DASHPlaylist.mpd` is 200 anonymously and lists the TRUE rendition names (old posts: extensionless `DASH_720`, audio `audio`; new posts: `DASH_720.mp4`, `DASH_AUDIO_128.mp4`) plus width/height per representation. The renditions themselves fetch anonymously (206 on range requests, video/mp4). The manifest is the single source of truth for qualities, names, and audio presence.
+- Hybrid resolver: if `REDDIT_CLIENT_ID`/`REDDIT_CLIENT_SECRET` exist, use the official OAuth API (full fidelity incl galleries); otherwise the vxreddit+manifest path (videos, GIFs, single images). Galleries on the anonymous path return an honest `unsupported_post` error ("Reddit galleries are not supported yet."); the FAQ says galleries are coming.
+- Share links (`/r/<sub>/s/<token>`): attempted through vxreddit on the anonymous path (unverified); if that fails they resolve to an error asking the user to paste the full post link. OAuth path follows them authenticated.
 
-## 1. Reddit resolver (`backend/app/reddit.py`)
+## 1. Reddit resolver (`backend/app/reddit.py`) - hybrid
+
+**Anonymous path (default):** `_fetch_vx(post_path)` GETs `https://www.vxreddit.com/<path>` with UA `Discordbot/2.0 (SaveVidAI; +https://savevidai.israfill.dev)`, parses OG tags (stdlib regex/HTMLParser, no new deps). Extracts: title, author/sub from `og:site_name`, the `v.redd.it` id from `og:video` params (or `og:image` for image posts). Then `_fetch_manifest(vid)` GETs `https://v.redd.it/<vid>/DASHPlaylist.mpd` (stdlib `xml.etree`), yielding video representations `(height, width, base_url)` and the audio base name when present. Variants: one per video representation, label `<h>p`, url `/api/mux/<vid>/<h>.mp4` when audio exists else `https://v.redd.it/<vid>/<base_url>`. No audio track = GIF-style direct downloads. Gallery/unrecognized posts -> `unsupported_post` (new error tuple, 422, honest copy).
+
+**OAuth path (upgrade, env-gated):** as originally specced below; used automatically when configured, covers galleries and share links fully. The original OAuth section follows.
 
 **Auth:** module-level token cache. `_get_token()` POSTs `https://www.reddit.com/api/v1/access_token` with HTTP basic auth (client id/secret), `grant_type=client_credentials`, custom UA `SaveVidAI/1.0 (+https://savevidai.israfill.dev)`. Token cached in-process until ~60s before expiry; thread-safe. Missing env vars raise `AppError("not_configured", ..., 503)` before any network call.
 
