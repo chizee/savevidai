@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { PasteInput } from "../components/PasteInput";
 import { PlatformLinks } from "../components/PlatformLinks";
@@ -10,6 +10,9 @@ import { useResolve } from "../hooks/useResolve";
 import { sendEvent } from "../lib/analytics";
 import { EASE_OUT, fadeRise } from "../lib/motion";
 
+// A stable public photo/video post, used as the one-click live demo.
+const EXAMPLE_URL = "https://www.tiktok.com/@scout2015/video/6718335390845095173";
+
 // Module-level (not component-level) so it survives React StrictMode's dev-time
 // double-invoke of effects and any remounts, guaranteeing one visit beacon per
 // page load rather than per mount.
@@ -17,8 +20,14 @@ let visitBeaconSent = false;
 
 export default function TikTokApp() {
   const { state, resolve } = useResolve();
+  const [prefill, setPrefill] = useState<string | null>(null);
   const navRef = useRef<HTMLElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  function runExample() {
+    setPrefill(EXAMPLE_URL);
+    resolve(EXAMPLE_URL);
+  }
 
   // Anonymous visit beacon, once per page load (module-level flag above guards
   // against StrictMode's double-invoke and any re-renders/remounts).
@@ -155,12 +164,16 @@ export default function TikTokApp() {
             status={state.status}
             errorMessage={state.status === "error" ? state.message : null}
             onSubmit={resolve}
+            presetValue={prefill}
             placeholder="Paste a TikTok video link"
             ariaLabel="TikTok video link"
           />
         </motion.div>
 
         <motion.div {...fadeRise(3)} className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+          <button type="button" className="chip chip-action" onClick={runExample}>
+            ▶ try an example
+          </button>
           <span className="chip">no login</span>
           <span className="chip">no watermark</span>
           <span className="chip">original quality</span>
