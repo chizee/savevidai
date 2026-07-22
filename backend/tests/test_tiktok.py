@@ -161,3 +161,15 @@ def test_map_slideshow_skips_non_https_images():
     res = map_tiktok("1", body)
     images = [i for i in res.items if i.kind == "image"]
     assert len(images) == 1
+
+
+def test_map_photo_post_all_images_unusable_never_offers_audio_as_video():
+    # A photo post whose images list is non-empty but every entry fails the https
+    # filter must not fall through to the video loop, where play/hdplay (byte-identical
+    # to the soundtrack on photo posts) would be offered as hd/sd video pills that
+    # download the audio as _hd.mp4. Expect no_video and zero video variants.
+    body = {"code": 0, "data": {**SLIDESHOW["data"],
+            "images": ["http://evil/a.jpg", "ftp://x/b.jpg"]}}
+    with pytest.raises(AppError) as exc:
+        map_tiktok("1", body)
+    assert exc.value.code == "no_video"

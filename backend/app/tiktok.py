@@ -101,6 +101,11 @@ def map_tiktok(url_id: str, body: dict) -> ResolveResponse:
         photo_urls = [u for u in images if isinstance(u, str) and u.startswith("https://")]
         if photo_urls:
             return _map_slideshow(url_id, data, photo_urls)
+        if images:
+            # Non-empty images means a photo post: play/hdplay duplicate the
+            # soundtrack, so never fall through to the video loop and offer audio
+            # as _hd.mp4. A truly empty/absent list keeps the fallthrough.
+            raise app_error(NO_VIDEO)
     author = data.get("author") or {}
     variants: list[Variant] = []
     # hdplay/play are watermark-free; wmplay carries the watermark and is never offered.
