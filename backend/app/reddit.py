@@ -21,11 +21,13 @@ Stdlib only for parsing (regex over meta tags plus html.unescape); no new deps.
 import html
 import logging
 import re
+from dataclasses import dataclass
 from urllib.parse import parse_qs, urlparse
+from xml.etree import ElementTree as ET
 
 import httpx
 
-from .errors import UPSTREAM, app_error
+from .errors import NO_VIDEO, UPSTREAM, app_error
 
 logger = logging.getLogger("savevidai.reddit")
 
@@ -45,6 +47,16 @@ _SITE_RE = re.compile(r"^u/([A-Za-z0-9_-]+)\s+on\s+r/([A-Za-z0-9_]+)")
 
 # A v.redd.it video id: the first path segment of the decoded video_url.
 _VREDD_ID_RE = re.compile(r"[A-Za-z0-9]{8,20}")
+
+# v.redd.it serves the DASH manifest anonymously; this UA is the contract with
+# that host and is deliberately distinct from the vxreddit Discordbot UA.
+_MANIFEST_UA = "SaveVidAI/1.0 (+https://savevidai.israfill.dev)"
+_MANIFEST_URL = "https://v.redd.it/{vid}/DASHPlaylist.mpd"
+
+# A DASH BaseURL becomes a URL path segment when we fetch the media bytes, so it
+# is validated to a bare filename charset. Anything with a slash, a "..", an
+# empty value, or other punctuation is treated as a corrupt/hostile manifest.
+_BASEURL_RE = re.compile(r"[A-Za-z0-9_.]+")
 
 
 def _parse_og(html_text: str) -> dict[str, str]:
@@ -134,3 +146,134 @@ def fetch_vx(path: str) -> dict:
             "honoured (got a plain meta-refresh body)", path, _VX_UA)
         raise app_error(UPSTREAM)
     return _build(og)
+
+
+@dataclass(frozen=True)
+class Rendition:
+    """One selectable video quality from a DASH manifest.
+
+    ``base_url`` is the manifest's child ``<BaseURL>`` for the Representation
+    (a bare filename such as ``DASH_720`` or ``DASH_1080.mp4``), already
+    validated to the safe charset. ``width`` is optional: newer manifests omit
+    it on the video Representations.
+    """
+
+    height: int
+    width: int | None
+    base_url: str
+
+
+@dataclass(frozen=True)
+class Manifest:
+    """Parsed v.redd.it DASH manifest: video renditions plus the audio track.
+
+    ``videos`` is sorted by height descending (best first). ``audio_base`` is
+    the audio Representation's BaseURL, or None when the manifest carries no
+    audio (silent clips have a video-only manifest).
+    """
+
+    videos: list[Rendition]
+    audio_base: str | None
+
+
+def _local(tag: str) -> str:
+    """Strip an ElementTree ``{namespace}`` prefix, leaving the local name.
+
+    ``Element.iter``/``find`` match tags literally rather than via ElementPath,
+    so the ``{*}`` wildcard is unavailable there; comparing local names keeps
+    the parser namespace-agnostic against the MPD default namespace.
+    """
+    return tag.rsplit("}", 1)[-1]
+
+
+def _child_base_url(rep: ET.Element) -> str | None:
+    """Return a Representation's stripped child ``<BaseURL>`` text, or None.
+
+    None means the ``<BaseURL>`` element is *absent* (caller skips the rep). A
+    present element with empty/whitespace text returns ``""``, which is a
+    distinct, malformed shape: it fails the BaseURL charset check and so is
+    rejected rather than skipped.
+    """
+    for child in rep:
+        if _local(child.tag) == "BaseURL":
+            return (child.text or "").strip()
+    return None
+
+
+def _parse_manifest(xml_text: str) -> Manifest:
+    """Parse a DASHPlaylist.mpd body into a Manifest.
+
+    Representations are classified by ``mimeType`` prefix (``video/`` vs
+    ``audio/``). A video Representation missing its height or BaseURL is skipped
+    (not fatal); a present-but-malformed BaseURL is fatal. No usable video
+    Representation at all is a genuine NO_VIDEO; any parse failure or malformed
+    manifest shape is UPSTREAM.
+    """
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError as exc:
+        logger.warning("v.redd.it manifest is not valid XML: %r", exc)
+        raise app_error(UPSTREAM) from exc
+
+    videos: list[Rendition] = []
+    audio_base: str | None = None
+
+    for rep in root.iter():
+        if _local(rep.tag) != "Representation":
+            continue
+        mime = rep.get("mimeType", "")
+        base = _child_base_url(rep)
+        if mime.startswith("video/"):
+            height = rep.get("height")
+            if height is None or not height.isdigit() or base is None:
+                # Incomplete/odd video rep: skip it rather than crashing.
+                continue
+            if not _BASEURL_RE.fullmatch(base):
+                logger.warning("v.redd.it video BaseURL rejected: %r", base)
+                raise app_error(UPSTREAM)
+            width = rep.get("width")
+            videos.append(Rendition(
+                height=int(height),
+                width=int(width) if width is not None and width.isdigit() else None,
+                base_url=base,
+            ))
+        elif mime.startswith("audio/"):
+            if base is None:
+                continue
+            if not _BASEURL_RE.fullmatch(base):
+                logger.warning("v.redd.it audio BaseURL rejected: %r", base)
+                raise app_error(UPSTREAM)
+            if audio_base is None:
+                audio_base = base
+
+    if not videos:
+        raise app_error(NO_VIDEO)
+
+    videos.sort(key=lambda r: r.height, reverse=True)
+    return Manifest(videos=videos, audio_base=audio_base)
+
+
+def fetch_manifest(vid: str) -> Manifest:
+    """Fetch and parse the DASH manifest for a v.redd.it video id.
+
+    ``vid`` is re-validated against the id charset on entry (defense in depth:
+    callers already validate, but this method builds a URL from it). A transport
+    failure, non-200, redirect, or non-XML body all map to UPSTREAM; a manifest
+    with no video Representation maps to NO_VIDEO.
+    """
+    if not _VREDD_ID_RE.fullmatch(vid):
+        # An id reaching this far outside the charset is an internal-invariant
+        # violation, not a user-facing "no video"; surface it as UPSTREAM.
+        logger.warning("fetch_manifest called with invalid vid %r", vid)
+        raise app_error(UPSTREAM)
+    url = _MANIFEST_URL.format(vid=vid)
+    try:
+        resp = httpx.get(url, headers={"User-Agent": _MANIFEST_UA},
+                         timeout=12.0, follow_redirects=False)
+    except httpx.HTTPError as exc:
+        logger.warning("v.redd.it manifest fetch failed for %s: %r", vid, exc)
+        raise app_error(UPSTREAM) from exc
+    if resp.status_code != 200:
+        logger.warning("v.redd.it manifest non-200 (%s) for %s", resp.status_code, vid)
+        raise app_error(UPSTREAM)
+    return _parse_manifest(resp.text)
