@@ -54,9 +54,22 @@ _MANIFEST_UA = "SaveVidAI/1.0 (+https://savevidai.israfill.dev)"
 _MANIFEST_URL = "https://v.redd.it/{vid}/DASHPlaylist.mpd"
 
 # A DASH BaseURL becomes a URL path segment when we fetch the media bytes, so it
-# is validated to a bare filename charset. Anything with a slash, a "..", an
-# empty value, or other punctuation is treated as a corrupt/hostile manifest.
+# is validated to a bare filename charset. Anything with a slash, an empty value,
+# or other punctuation is treated as a corrupt/hostile manifest. Dot characters
+# are inside the charset (real filenames carry a ".mp4" extension), so a separate
+# guard rejects dots-only values like "." or ".." that the charset alone admits
+# but would resolve to a traversal/current-directory path segment.
 _BASEURL_RE = re.compile(r"[A-Za-z0-9_.]+")
+
+
+def _valid_base_url(base: str) -> bool:
+    """True when ``base`` is a safe bare filename for a URL path segment.
+
+    Requires the full string to match the filename charset AND not be composed
+    entirely of dot characters ("." / ".." / "..."), which would otherwise pass
+    the charset yet resolve to a path-traversal or current-directory segment.
+    """
+    return bool(_BASEURL_RE.fullmatch(base)) and base.strip(".") != ""
 
 
 def _parse_og(html_text: str) -> dict[str, str]:
@@ -228,7 +241,7 @@ def _parse_manifest(xml_text: str) -> Manifest:
             if height is None or not height.isdigit() or base is None:
                 # Incomplete/odd video rep: skip it rather than crashing.
                 continue
-            if not _BASEURL_RE.fullmatch(base):
+            if not _valid_base_url(base):
                 logger.warning("v.redd.it video BaseURL rejected: %r", base)
                 raise app_error(UPSTREAM)
             width = rep.get("width")
@@ -240,7 +253,7 @@ def _parse_manifest(xml_text: str) -> Manifest:
         elif mime.startswith("audio/"):
             if base is None:
                 continue
-            if not _BASEURL_RE.fullmatch(base):
+            if not _valid_base_url(base):
                 logger.warning("v.redd.it audio BaseURL rejected: %r", base)
                 raise app_error(UPSTREAM)
             if audio_base is None:

@@ -121,6 +121,46 @@ SLASH_BASEURL_MPD = """<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static">
     </Period>
 </MPD>"""
 
+# One video rep whose BaseURL is entirely dot characters (".."). Like the slash
+# case this passes the naive charset but would splice into a byte-fetch URL as a
+# path-traversal segment, so it must be rejected as a corrupt/hostile manifest.
+DOTS_BASEURL_MPD = """<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static">
+    <Period>
+        <AdaptationSet>
+            <Representation height="720" mimeType="video/mp4">
+                <BaseURL>..</BaseURL>
+            </Representation>
+        </AdaptationSet>
+    </Period>
+</MPD>"""
+
+# A video rep whose BaseURL is a single dot (".") - the current-directory shape.
+DOT_BASEURL_MPD = """<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static">
+    <Period>
+        <AdaptationSet>
+            <Representation height="720" mimeType="video/mp4">
+                <BaseURL>.</BaseURL>
+            </Representation>
+        </AdaptationSet>
+    </Period>
+</MPD>"""
+
+# One video rep with a dots-only BaseURL ("..") alongside a well-formed rep. A
+# malformed BaseURL is fatal (same as the slash case), so the whole parse raises
+# UPSTREAM rather than salvaging the valid rep.
+DOTS_MIX_MPD = """<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static">
+    <Period>
+        <AdaptationSet>
+            <Representation height="1080" mimeType="video/mp4">
+                <BaseURL>DASH_1080.mp4</BaseURL>
+            </Representation>
+            <Representation height="720" mimeType="video/mp4">
+                <BaseURL>..</BaseURL>
+            </Representation>
+        </AdaptationSet>
+    </Period>
+</MPD>"""
+
 # A video rep whose BaseURL is present but empty text.
 EMPTY_BASEURL_MPD = """<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static">
     <Period>
@@ -217,6 +257,35 @@ def test_baseurl_with_slash_rejected_as_upstream():
     _mock("slashvid1234", text=SLASH_BASEURL_MPD)
     with pytest.raises(AppError) as exc:
         fetch_manifest("slashvid1234")
+    assert exc.value.code == "upstream_error"
+
+
+@respx.mock
+def test_dots_only_baseurl_rejected_as_upstream():
+    # A BaseURL of ".." passes the bare charset but is a path-traversal segment
+    # once spliced into the byte-fetch URL, so it is treated exactly like the
+    # slash case: a corrupt/hostile manifest mapping to UPSTREAM, not NO_VIDEO.
+    _mock("dotsvid12345", text=DOTS_BASEURL_MPD)
+    with pytest.raises(AppError) as exc:
+        fetch_manifest("dotsvid12345")
+    assert exc.value.code == "upstream_error"
+
+
+@respx.mock
+def test_single_dot_baseurl_rejected_as_upstream():
+    _mock("dotvid123456", text=DOT_BASEURL_MPD)
+    with pytest.raises(AppError) as exc:
+        fetch_manifest("dotvid123456")
+    assert exc.value.code == "upstream_error"
+
+
+@respx.mock
+def test_dots_only_baseurl_is_fatal_even_beside_valid_rep():
+    # A malformed BaseURL is fatal (matching the slash semantics), so a manifest
+    # mixing a dots-only rep with a valid one raises rather than salvaging.
+    _mock("dotsmix12345", text=DOTS_MIX_MPD)
+    with pytest.raises(AppError) as exc:
+        fetch_manifest("dotsmix12345")
     assert exc.value.code == "upstream_error"
 
 
