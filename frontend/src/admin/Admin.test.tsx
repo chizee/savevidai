@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 import { Admin, Dashboard } from "./Admin";
@@ -108,12 +108,15 @@ test("dashboard renders tiles, totals, and bar lists from a stats fixture", () =
   expect(screen.getByText("1080p")).toBeInTheDocument();
   expect(screen.getByText("no_video")).toBeInTheDocument();
   // By platform panel: label per platform, fetches as the bar value, downloads alongside.
-  expect(screen.getByText(/by platform/i)).toBeInTheDocument();
-  expect(screen.getByText("twitter")).toBeInTheDocument();
-  expect(screen.getByText("tiktok")).toBeInTheDocument();
-  expect(screen.getByText("10")).toBeInTheDocument(); // twitter fetches
-  expect(screen.getByText(/8 downloads/i)).toBeInTheDocument();
-  expect(screen.getByText(/3 downloads/i)).toBeInTheDocument();
+  // Scope to the panel so tiktok's fetches ("4") can't collide with the errors
+  // panel's no_video count, which is also 4.
+  const platformPanel = within(screen.getByText("By platform").closest(".panel") as HTMLElement);
+  expect(platformPanel.getByText("twitter")).toBeInTheDocument();
+  expect(platformPanel.getByText("tiktok")).toBeInTheDocument();
+  expect(platformPanel.getByText("10")).toBeInTheDocument(); // twitter fetches
+  expect(platformPanel.getByText("4")).toBeInTheDocument(); // tiktok fetches
+  expect(platformPanel.getByText(/8 downloads/i)).toBeInTheDocument();
+  expect(platformPanel.getByText(/3 downloads/i)).toBeInTheDocument();
   // Empty series/hours fall back to the same "No data yet." empty state as BarList.
   expect(screen.getAllByText(/no data yet/i).length).toBeGreaterThanOrEqual(2);
 });
