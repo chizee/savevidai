@@ -202,3 +202,83 @@ def test_stats_platforms_breakdown():
     assert by["twitter"]["fetches"] == 1
     assert by["tiktok"]["fetches"] == 1
     assert by["tiktok"]["downloads"] == 1
+
+
+def test_platforms_breakdown_nonzero_tz_window_not_truncated():
+    # Regression for the same UTC-vs-local window class as
+    # test_compute_stats_nonzero_tz_window_not_truncated_and_hour_shift, but
+    # aimed at the platforms breakdown query specifically. The existing
+    # platforms test only runs tz=0 (where local == UTC), so a future rewrite
+    # of the platforms query to a fixed UTC-instant cutoff
+    # (ts >= datetime('now','-days days')) would still pass it. This pins the
+    # local-time window: a platform-tagged event that sits BEFORE the buggy
+    # UTC cutoff but INSIDE the correct local-date window must be counted.
+    tz = 360
+    days = 30
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    local_now = now + timedelta(minutes=tz)
+    earliest_local_day = (local_now - timedelta(days=days)).date()
+    earliest_local_midnight_utc = datetime.combine(earliest_local_day, time.min) - timedelta(minutes=tz)
+
+    # The would-be buggy filter `ts >= datetime('now','-days days')` cuts at a
+    # fixed UTC instant strictly later than the earliest local midnight (when
+    # tz > 0). An event between local midnight and that instant belongs to a
+    # day the window should fully include, yet a UTC-instant filter drops it.
+    buggy_cutoff = now - timedelta(days=days)
+    gap = buggy_cutoff - earliest_local_midnight_utc
+    assert gap > timedelta(0), "test must not run exactly at local midnight"
+
+    boundary_event_ts = earliest_local_midnight_utc + gap / 2
+    assert boundary_event_ts < buggy_cutoff
+    assert (boundary_event_ts + timedelta(minutes=tz)).date() == earliest_local_day
+
+    def fmt(dt: datetime) -> str:
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+    s = SqliteStore(":memory:")
+    s.init_schema()
+    s.execute_many([
+        # Boundary fetch: excluded by a UTC-instant window, included by the
+        # correct local-date window.
+        ("INSERT INTO events (ts,type,outcome,country,visitor,platform) VALUES (?,?,?,?,?,?)",
+         [fmt(boundary_event_ts), "fetch", "ok", "BD", "boundary-visitor", "tiktok"]),
+        # A second platform comfortably inside the window, so the breakdown is
+        # non-empty either way and the boundary row is the only thing at stake.
+        ("INSERT INTO events (ts,type,outcome,country,visitor,platform) VALUES (?,?,?,?,?,?)",
+         [fmt(now - timedelta(days=1)), "fetch", "ok", "US", "inside-visitor", "twitter"]),
+    ])
+
+    out = compute_stats(s, days=days, tz=tz)
+    by = {p["platform"]: p for p in out["platforms"]}
+    assert by["twitter"]["fetches"] == 1
+    # If the platforms query used a UTC-instant cutoff, tiktok would be absent.
+    assert "tiktok" in by, "boundary-day platform truncated by a UTC-instant window filter"
+    assert by["tiktok"]["fetches"] == 1
+
+
+def test_platforms_breakdown_ordered_by_fetches_desc():
+    # Pins "ORDER BY fetches DESC" on the platforms query. The existing
+    # platforms test ties fetch counts 1-1 and reads the result into a dict,
+    # discarding order, so dropping the ORDER BY would not fail it. Here the
+    # counts are unequal and we assert the list order directly.
+    s = SqliteStore(":memory:")
+    s.init_schema()
+    rows = [
+        # twitter: 1 fetch
+        ("2026-07-20 10:00:00", "fetch", "ok", None, "v1", "twitter"),
+        # tiktok: 3 fetches (the largest, must sort first)
+        ("2026-07-20 10:01:00", "fetch", "ok", None, "v2", "tiktok"),
+        ("2026-07-20 10:02:00", "fetch", "ok", None, "v3", "tiktok"),
+        ("2026-07-20 10:03:00", "fetch", "ok", None, "v4", "tiktok"),
+        # instagram: 2 fetches (middle)
+        ("2026-07-20 10:04:00", "fetch", "ok", None, "v5", "instagram"),
+        ("2026-07-20 10:05:00", "fetch", "ok", None, "v6", "instagram"),
+    ]
+    s.execute_many([
+        ("INSERT INTO events (ts,type,outcome,country,visitor,platform) VALUES (?,?,?,?,?,?)", list(r))
+        for r in rows
+    ])
+    out = compute_stats(s, days=30, tz=0)
+    order = [p["platform"] for p in out["platforms"]]
+    assert order == ["tiktok", "instagram", "twitter"]
