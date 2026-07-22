@@ -9,7 +9,7 @@ import logging
 
 import httpx
 
-from .errors import NO_VIDEO, NOT_FOUND, UPSTREAM, app_error
+from .errors import NO_VIDEO, NOT_FOUND, UPSTREAM, AppError, app_error
 from .schemas import MediaItem, ResolveResponse, Variant
 
 logger = logging.getLogger("savevidai.tiktok")
@@ -39,7 +39,19 @@ def extract_tiktok(url: str) -> ResolveResponse:
         raise app_error(UPSTREAM) from exc
     if not isinstance(body, dict):
         raise app_error(UPSTREAM)
-    return map_tiktok(url, body)
+    return _map_guarded(url, body)
+
+
+def _map_guarded(url_id: str, body: dict) -> ResolveResponse:
+    """Run the mapper over untrusted upstream JSON; any shape we didn't anticipate
+    becomes a clean upstream_error instead of an unhandled 500 (mirrors extractor)."""
+    try:
+        return map_tiktok(url_id, body)
+    except AppError:
+        raise
+    except Exception as exc:
+        logger.warning("tiktok mapping failed for %s: %r", url_id, exc)
+        raise app_error(UPSTREAM) from exc
 
 
 def _size(value: object) -> int | None:

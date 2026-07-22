@@ -1,7 +1,7 @@
 import pytest
 
 from app.errors import AppError
-from app.tiktok import map_tiktok
+from app.tiktok import _map_guarded, map_tiktok
 
 OK = {
     "code": 0,
@@ -24,6 +24,28 @@ OK = {
 }
 NO_VID = {"code": 0, "data": {"id": "1", "title": "", "author": {"unique_id": "u", "nickname": "U"}}}
 ERR = {"code": -1, "msg": "url parse err"}
+# author is a truthy non-dict (string). `data.get("author") or {}` keeps it, so a
+# later author.get(...) would raise AttributeError and escape as an unhandled 500.
+BAD_AUTHOR = {
+    "code": 0,
+    "data": {
+        "id": "1",
+        "title": "t",
+        "hdplay": "https://v16m.tiktokcdn-us.com/video/hdplay/x.mp4",
+        "hd_size": 100,
+        "author": "someone",
+    },
+}
+# hd_size variants that must degrade to size_bytes is None via _size().
+NO_HD_SIZE = {
+    "code": 0,
+    "data": {
+        "id": "1",
+        "title": "t",
+        "hdplay": "https://v16m.tiktokcdn-us.com/video/hdplay/x.mp4",
+        "author": {"unique_id": "u", "nickname": "U"},
+    },
+}
 
 
 def test_map_ok_prefers_no_watermark_hd_then_sd():
@@ -57,3 +79,27 @@ def test_map_error_code_raises_upstream():
     with pytest.raises(AppError) as exc:
         map_tiktok("1", ERR)
     assert exc.value.code in ("upstream_error", "not_found")
+
+
+def test_map_raw_attributeerror_on_bad_author():
+    # RED before the guard: a truthy non-dict author leaks AttributeError.
+    with pytest.raises(AttributeError):
+        map_tiktok("1", BAD_AUTHOR)
+
+
+def test_guarded_truthy_non_dict_author_becomes_upstream():
+    # Regression for finding 1: the guard converts the raw AttributeError into a
+    # clean upstream_error instead of an unhandled 500.
+    with pytest.raises(AppError) as exc:
+        _map_guarded("1", BAD_AUTHOR)
+    assert exc.value.code == "upstream_error"
+
+
+@pytest.mark.parametrize("hd_size", [0, -5, "2004627", 3.5, None, ...])
+def test_size_none_branch_when_hd_size_not_positive_int(hd_size):
+    body = {"code": 0, "data": dict(NO_HD_SIZE["data"])}
+    if hd_size is not ...:
+        body["data"]["hd_size"] = hd_size
+    res = map_tiktok("1", body)
+    assert res.items[0].variants[0].label == "hd"
+    assert res.items[0].variants[0].size_bytes is None
