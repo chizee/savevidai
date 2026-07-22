@@ -3,6 +3,7 @@ import type { MediaItem, ResolveResponse } from "../lib/api";
 import { buildFilename } from "../lib/download";
 import { formatDuration } from "../lib/format";
 import { cardReveal, cascade } from "../lib/motion";
+import { PhotoGrid } from "./PhotoGrid";
 import { QualityButton } from "./QualityButton";
 
 export function PreviewCard({
@@ -12,6 +13,12 @@ export function PreviewCard({
   data: ResolveResponse;
   platform?: "twitter" | "tiktok";
 }) {
+  // Route slideshow photos and the soundtrack to PhotoGrid; MediaSection only
+  // ever handles playable video/gif items (its play badge + .mp4 filenames).
+  const photos = data.items.filter((i) => i.kind === "image");
+  const audio = data.items.find((i) => i.kind === "audio") ?? null;
+  const media = data.items.filter((i) => i.kind === "video" || i.kind === "gif");
+
   return (
     <motion.article {...cardReveal} data-testid="preview-card" className="panel p-5">
       <motion.div {...cascade(0)} className="flex items-center gap-3">
@@ -35,8 +42,23 @@ export function PreviewCard({
       )}
 
       <div className="mt-4 space-y-6">
-        {data.items.map((item) => (
-          <MediaSection key={item.index} item={item} data={data} platform={platform} />
+        {photos.length > 0 && (
+          <PhotoGrid
+            photos={photos}
+            audio={audio}
+            handle={data.handle}
+            id={data.id}
+            platform={platform}
+          />
+        )}
+        {media.map((item) => (
+          <MediaSection
+            key={item.index}
+            item={item}
+            count={media.length}
+            data={data}
+            platform={platform}
+          />
         ))}
       </div>
     </motion.article>
@@ -45,14 +67,16 @@ export function PreviewCard({
 
 function MediaSection({
   item,
+  count,
   data,
   platform,
 }: {
   item: MediaItem;
+  count: number;
   data: ResolveResponse;
   platform: "twitter" | "tiktok";
 }) {
-  const many = data.items.length > 1;
+  const many = count > 1;
   return (
     <section aria-label={many ? `Video ${item.index}` : "Video"}>
       {many && (
@@ -87,7 +111,7 @@ function MediaSection({
             variant={variant}
             primary={i === 0}
             platform={platform}
-            filename={buildFilename(data.handle, data.id, variant.label, item.index, data.items.length)}
+            filename={buildFilename(data.handle, data.id, variant.label, item.index, count)}
           />
         ))}
       </motion.div>

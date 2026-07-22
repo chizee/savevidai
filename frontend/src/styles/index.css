@@ -424,6 +424,82 @@ a.platform-card:hover {
   }
 }
 
+/* Slideshow photo grid: 3 up on desktop, 2 at small sizes, panel-rounded tiles */
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .photo-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.photo-tile {
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--pill);
+  aspect-ratio: 9 / 16;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    transform 0.15s ease,
+    box-shadow 0.18s ease;
+}
+.photo-tile:hover {
+  border-color: var(--accent);
+  box-shadow: 0 6px 20px rgba(0, 113, 227, 0.18);
+}
+.photo-tile:active {
+  transform: scale(0.98);
+}
+.photo-tile img,
+.photo-tile-empty {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo-tile img {
+  transition: transform 0.3s ease;
+}
+.photo-tile:hover img {
+  transform: scale(1.04);
+}
+.photo-tile-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: rgb(0 0 0 / 0.45);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.photo-tile[data-state="saving"] .photo-tile-overlay,
+.photo-tile[data-state="saved"] .photo-tile-overlay,
+.photo-tile[data-state="failed"] .photo-tile-overlay {
+  opacity: 1;
+}
+.photo-tile[data-state="saved"] .photo-tile-overlay {
+  background: color-mix(in srgb, var(--chart-download) 78%, transparent);
+}
+.photo-tile[data-state="failed"] .photo-tile-overlay {
+  background: rgb(255 59 48 / 0.62);
+}
+.photo-spinner {
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* HD chip inside the primary quality button */
 .hd-chip {
   border-radius: 999px;
