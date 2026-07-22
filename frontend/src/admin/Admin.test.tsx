@@ -24,6 +24,10 @@ const STATS: Stats = {
   qualities: [{ quality: "1080p", count: 30 }],
   errors: [{ code: "no_video", count: 4 }],
   hours: [],
+  platforms: [
+    { platform: "twitter", fetches: 10, downloads: 8 },
+    { platform: "tiktok", fetches: 4, downloads: 3 },
+  ],
 };
 
 test("shows login first, then dashboard after auth", async () => {
@@ -103,6 +107,13 @@ test("dashboard renders tiles, totals, and bar lists from a stats fixture", () =
   expect(screen.getByText("BD")).toBeInTheDocument();
   expect(screen.getByText("1080p")).toBeInTheDocument();
   expect(screen.getByText("no_video")).toBeInTheDocument();
+  // By platform panel: label per platform, fetches as the bar value, downloads alongside.
+  expect(screen.getByText(/by platform/i)).toBeInTheDocument();
+  expect(screen.getByText("twitter")).toBeInTheDocument();
+  expect(screen.getByText("tiktok")).toBeInTheDocument();
+  expect(screen.getByText("10")).toBeInTheDocument(); // twitter fetches
+  expect(screen.getByText(/8 downloads/i)).toBeInTheDocument();
+  expect(screen.getByText(/3 downloads/i)).toBeInTheDocument();
   // Empty series/hours fall back to the same "No data yet." empty state as BarList.
   expect(screen.getAllByText(/no data yet/i).length).toBeGreaterThanOrEqual(2);
 });

@@ -155,7 +155,13 @@ function TotalsTable({ totals }: { totals: Stats["totals"] }) {
   );
 }
 
-function BarList({ title, rows }: { title: string; rows: Array<{ label: string; count: number }> }) {
+function BarList({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: Array<{ label: string; count: number; note?: string }>;
+}) {
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
     <div className="panel p-4">
@@ -170,6 +176,7 @@ function BarList({ title, rows }: { title: string; rows: Array<{ label: string; 
               style={{ width: `${(r.count / max) * 100}%` }}
             />
             <span className="font-mono text-xs text-[var(--muted)]">{r.count}</span>
+            {r.note && <span className="shrink-0 font-mono text-xs text-[var(--faint)]">{r.note}</span>}
           </div>
         ))}
       </div>
@@ -340,6 +347,14 @@ export function Dashboard({ stats }: { stats: Stats }) {
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <LineChart series={stats.series} />
         <BarList title="Top countries" rows={stats.countries.map((c) => ({ label: c.country, count: c.count }))} />
+        <BarList
+          title="By platform"
+          rows={(stats.platforms ?? []).map((p) => ({
+            label: p.platform,
+            count: p.fetches,
+            note: `${p.downloads} downloads`,
+          }))}
+        />
         <BarList title="Top qualities" rows={stats.qualities.map((q) => ({ label: q.quality, count: q.count }))} />
         <BarList title="Errors (FixTweet health)" rows={stats.errors.map((e) => ({ label: e.code, count: e.count }))} />
         <HourStrip hours={stats.hours} />

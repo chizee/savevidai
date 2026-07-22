@@ -9,6 +9,7 @@ export type Stats = {
   qualities: Array<{ quality: string; count: number }>;
   errors: Array<{ code: string; count: number }>;
   hours: Array<{ hour: number; count: number }>;
+  platforms: Array<{ platform: string; fetches: number; downloads: number }>;
 };
 type Period = { today: number; d7: number; d30: number; all_time: number };
 
