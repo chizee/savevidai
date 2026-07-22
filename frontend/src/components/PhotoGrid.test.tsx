@@ -89,11 +89,13 @@ test("Save all fires exactly one album beacon and one proxy fetch per photo", as
   vi.stubGlobal("fetch", fetchMock);
   render(<PhotoGrid photos={PHOTOS} audio={null} handle="ada" id="222" platform="tiktok" />);
 
-  // fireEvent (not userEvent) so it doesn't fight the fake clock; runAllTimersAsync
-  // flushes the sequential downloads and the 600ms staggers between them.
+  // fireEvent (not userEvent) so it doesn't fight the fake clock. Bounded advance
+  // (not runAllTimersAsync) so motion's requestAnimationFrame loop can't spin the
+  // fake clock to vitest's 10000-timer abort; STAGGER_MS * 4 covers the three
+  // sequential downloads and the two 600ms staggers between them.
   await act(async () => {
     fireEvent.click(screen.getByRole("button", { name: /save all/i }));
-    await vi.runAllTimersAsync();
+    await vi.advanceTimersByTimeAsync(STAGGER_MS * 4);
   });
 
   const beacons = fetchMock.mock.calls.filter(([u]) => String(u) === "/api/event");
@@ -155,9 +157,11 @@ test("Save all: a failed photo is marked and the sweep continues sequentially, o
   expect(order).toHaveLength(2);
   expect(order[1]).toContain("photo_2.jpg");
 
-  // Advance past the second stagger: photo 3 completes the sweep.
+  // Advance past the second stagger: photo 3 completes the sweep. Bounded advance
+  // (not runAllTimersAsync) so motion's requestAnimationFrame loop can't spin the
+  // fake clock to vitest's 10000-timer abort.
   await act(async () => {
-    await vi.runAllTimersAsync();
+    await vi.advanceTimersByTimeAsync(STAGGER_MS * 4);
   });
   expect(order).toHaveLength(3);
   expect(order[2]).toContain("photo_3.jpg");
