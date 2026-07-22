@@ -116,16 +116,12 @@ function Landscape() {
         {/* best quality pill (primary) */}
         <rect x="1040" y="96" width="246" height="56" rx="28" fill="var(--accent)" />
         <text x="1062" y="131" fontFamily="var(--font-sans)" fontSize="19" fontWeight="700" fill="#fff">
-          hd
-        </text>
-        <rect x="1170" y="106" width="36" height="22" rx="11" fill="#ffffff" opacity="0.24" />
-        <text x="1188" y="122" textAnchor="middle" fontFamily="var(--font-sans)" fontSize="12" fontWeight="800" fill="#fff">
           HD
         </text>
         {/* secondary pill */}
         <rect x="1040" y="166" width="218" height="52" rx="26" fill="var(--pill)" stroke="var(--line)" />
         <text x="1062" y="199" fontFamily="var(--font-sans)" fontSize="17" fontWeight="600" fill="var(--fg)">
-          sd
+          SD
         </text>
         {/* saved row */}
         <line x1="1040" y1="312" x2="1306" y2="312" stroke="var(--line)" />
@@ -242,15 +238,11 @@ function Stacked() {
         <rect x="24" y="532" width="512" height="452" rx="22" fill="var(--card)" stroke="var(--line)" />
         <rect x="56" y="568" width="268" height="60" rx="30" fill="var(--accent)" />
         <text x="86" y="606" fontFamily="var(--font-sans)" fontSize="20" fontWeight="700" fill="#fff">
-          hd
-        </text>
-        <rect x="204" y="580" width="38" height="24" rx="12" fill="#ffffff" opacity="0.24" />
-        <text x="223" y="597" textAnchor="middle" fontFamily="var(--font-sans)" fontSize="13" fontWeight="800" fill="#fff">
           HD
         </text>
         <rect x="56" y="646" width="240" height="56" rx="28" fill="var(--pill)" stroke="var(--line)" />
         <text x="86" y="681" fontFamily="var(--font-sans)" fontSize="18" fontWeight="600" fill="var(--fg)">
-          sd
+          SD
         </text>
         <line x1="56" y1="812" x2="504" y2="812" stroke="var(--line)" />
         <circle cx="78" cy="862" r="17" fill="#34c759" />

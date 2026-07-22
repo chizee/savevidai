@@ -27,7 +27,9 @@ export function QualityButton({
   // Show the true stored resolution (e.g. "1280×720"); fall back to the "720p"
   // label only when the API didn't give dimensions (rare, e.g. some GIFs).
   const dims =
-    variant.width && variant.height ? `${variant.width}×${variant.height}` : variant.label;
+    variant.width && variant.height
+      ? `${variant.width}×${variant.height}`
+      : variant.label.toUpperCase();
   const isHd = (variant.height ?? 0) >= 720 || variant.label === "hd";
 
   async function start() {
@@ -81,7 +83,9 @@ export function QualityButton({
           </span>
         ) : (
           <>
-            {isHd && <span className="hd-chip uppercase">HD</span>}
+            {variant.width && variant.height && isHd && (
+              <span className="hd-chip uppercase">HD</span>
+            )}
             <span className="font-semibold tabular-nums">{dims}</span>
             {size && <span className="font-mono text-xs opacity-70">{size}</span>}
             {phase.name === "failed" && <span className="text-xs text-red-400">retry</span>}

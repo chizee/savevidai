@@ -75,7 +75,7 @@ test("download beacon failure does not block or alter the download", async () =>
   expect(await screen.findByText("Saved")).toBeInTheDocument();
 });
 
-test("hd label without dimensions still gets the HD chip", () => {
+test("hd label without dimensions shows uppercase HD text and no redundant chip", () => {
   render(
     <QualityButton
       variant={{ label: "hd", width: null, height: null, url: "https://v16m.tiktokcdn-us.com/x.mp4", size_bytes: 1000 }}
@@ -83,6 +83,21 @@ test("hd label without dimensions still gets the HD chip", () => {
       platform="tiktok"
     />,
   );
+  // The pill text is the uppercased label, and there is no separate HD chip,
+  // so "HD" appears exactly once (no doubled-up "HD HD").
+  expect(screen.getAllByText("HD")).toHaveLength(1);
+  // Lowercase "hd" is display-only uppercased; it must not appear.
+  expect(screen.queryByText("hd")).not.toBeInTheDocument();
+});
+
+test("dimensioned hd variant shows the WxH text plus the HD chip", () => {
+  render(
+    <QualityButton
+      variant={{ label: "1080p", width: 1920, height: 1080, url: "https://video.twimg.com/x.mp4", size_bytes: 1000 }}
+      filename="v.mp4"
+    />,
+  );
+  // Real dimensions render as text and still carry the small HD chip.
+  expect(screen.getByText("1920×1080")).toBeInTheDocument();
   expect(screen.getByText("HD")).toBeInTheDocument();
-  expect(screen.getByText("hd")).toBeInTheDocument();
 });
