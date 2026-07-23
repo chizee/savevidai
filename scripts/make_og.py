@@ -4,6 +4,7 @@ Usage:
     pip install pillow
     python scripts/make_og.py                 # default (Twitter) -> og.png
     python scripts/make_og.py --variant tiktok # TikTok         -> og-tiktok.png
+    python scripts/make_og.py --variant reddit # Reddit         -> og-reddit.png
 """
 import argparse
 from pathlib import Path
@@ -31,6 +32,11 @@ VARIANTS = {
         "filename": "og-tiktok.png",
         "title": "TikTok Video Downloader",
         "subtitle": "No watermark. Free.",
+    },
+    "reddit": {
+        "filename": "og-reddit.png",
+        "title": "Reddit Video Downloader",
+        "subtitle": "With audio. Free.",
     },
 }
 

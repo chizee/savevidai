@@ -5,6 +5,7 @@ import { PlatformLinks } from "../components/PlatformLinks";
 import { PreviewCard } from "../components/PreviewCard";
 import { SkeletonCard } from "../components/SkeletonCard";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { RedditHowToVisual } from "./RedditHowToVisual";
 import { useResolve } from "../hooks/useResolve";
 import { sendEvent } from "../lib/analytics";
 import { EASE_OUT, fadeRise } from "../lib/motion";
@@ -196,7 +197,9 @@ export default function RedditApp() {
           {state.status === "ready" && <PreviewCard data={state.data} platform="reddit" />}
         </div>
 
-        {/* How-to visual slot: Task 11 wires RedditHowToVisual here. */}
+        <motion.div {...fadeRise(6)}>
+          <RedditHowToVisual />
+        </motion.div>
       </main>
     </div>
   );
