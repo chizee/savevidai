@@ -181,6 +181,39 @@ def test_oversize_returns_413(fake_ffmpeg):
 
 
 @respx.mock
+def test_combined_streams_over_budget_returns_413(fake_ffmpeg, monkeypatch):
+    # Regression: the size cap must be a SINGLE budget shared across the video and
+    # audio writes, not reset per stream. Neither stream advertises a Content-Length,
+    # so the header pre-check cannot fire; each stream alone stays under the cap, but
+    # their COMBINED on-disk bytes exceed it. With a per-stream reset both would pass
+    # and the merge would 200; a shared budget must abort with 413.
+    monkeypatch.setattr(mux_module, "_MAX_BYTES", 100)
+    root = tempfile.mkdtemp(prefix="muxroot-")
+    real_mkdtemp = tempfile.mkdtemp
+    monkeypatch.setattr(mux_module.tempfile, "mkdtemp",
+                        lambda *a, **k: real_mkdtemp(prefix="mux-", dir=root))
+    before = mux_module._SEM._value
+    async def _body(byte: bytes, n: int):
+        yield byte * n
+
+    respx.get(MANIFEST_URL).mock(return_value=httpx.Response(200, text=OLD_MPD))
+    # 60 bytes each: each under 100, combined 120 over 100. An async-generator body
+    # carries NO Content-Length header, so the header pre-check cannot catch this -
+    # only the shared per-chunk budget can.
+    respx.get(f"https://v.redd.it/{VID}/DASH_720").mock(
+        return_value=httpx.Response(200, content=_body(b"v", 60)))
+    respx.get(f"https://v.redd.it/{VID}/audio").mock(
+        return_value=httpx.Response(200, content=_body(b"a", 60)))
+    try:
+        res = client().get(f"/api/mux/{VID}/720.mp4")
+        assert res.status_code == 413
+        assert os.listdir(root) == []  # temp dir cleaned up after the 413
+        assert mux_module._SEM._value == before  # permit released, no leak
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+@respx.mock
 def test_ffmpeg_nonzero_exit_returns_502_and_cleans_tempdir(monkeypatch):
     monkeypatch.setattr(mux_module.shutil, "which", lambda name: "/usr/bin/ffmpeg")
     monkeypatch.setattr(asyncio, "create_subprocess_exec", _fake_exec(1, False))

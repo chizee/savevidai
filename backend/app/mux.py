@@ -91,18 +91,20 @@ def _content_length(resp: httpx.Response) -> int:
     return int(raw)
 
 
-async def _write_stream(resp: httpx.Response, dest: str) -> None:
-    """Write an already-opened streaming response body to ``dest`` with a cap.
+async def _write_stream(resp: httpx.Response, dest: str, budget: list[int]) -> None:
+    """Write an already-opened streaming response body to ``dest`` with a shared cap.
 
-    The combined-header check runs before either body is pulled; this per-chunk
-    guard is defense in depth against an upstream that lies about (or omits) its
-    Content-Length and then streams a body larger than the ceiling.
+    ``budget[0]`` is the running COMBINED on-disk byte total across every stream
+    written for this request; it is not reset between calls. The combined-header
+    check runs before either body is pulled; this per-chunk guard is defense in
+    depth against an upstream that lies about (or omits) its Content-Length. Because
+    the budget is shared, the video and audio bodies can never together exceed the
+    ceiling even when neither advertises a size.
     """
-    written = 0
     with open(dest, "wb") as out:
         async for chunk in resp.aiter_bytes(1 << 16):
-            written += len(chunk)
-            if written > _MAX_BYTES:
+            budget[0] += len(chunk)
+            if budget[0] > _MAX_BYTES:
                 raise AppError(*_TOO_LARGE)
             out.write(chunk)
 
@@ -166,8 +168,12 @@ async def mux(request: Request, vid: str, height: int, filename: str = "video.mp
                         raise app_error(UPSTREAM)
                     if _content_length(v_resp) + _content_length(a_resp) > _MAX_BYTES:
                         raise AppError(*_TOO_LARGE)
-                    await _write_stream(v_resp, video_path)
-                    await _write_stream(a_resp, audio_path)
+                    # One budget shared across both writes: their combined on-disk
+                    # bytes can never exceed _MAX_BYTES, even if neither stream
+                    # advertised (or both understated) a Content-Length.
+                    budget = [0]
+                    await _write_stream(v_resp, video_path, budget)
+                    await _write_stream(a_resp, audio_path, budget)
                 finally:
                     await a_resp.aclose()
             finally:
