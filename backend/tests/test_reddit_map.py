@@ -60,7 +60,8 @@ def test_video_post_four_variants_with_mux_urls():
     assert item.kind == "video"
     assert item.index == 1
     assert item.duration_seconds is None
-    assert item.thumbnail is None
+    # og:image on a reddit host is now surfaced as the video preview thumbnail.
+    assert item.thumbnail == "https://external-preview.redd.it/whatever.png"
     assert [(v.label, v.width, v.height, v.url) for v in item.variants] == [
         ("720p", 404, 720, "/api/mux/enxxsuo5xko31/720.mp4"),
         ("480p", 270, 480, "/api/mux/enxxsuo5xko31/480.mp4"),
@@ -77,6 +78,25 @@ def test_no_audio_manifest_yields_direct_vreddit_urls():
     assert variant.label == "720p"
     assert variant.width == 1280
     assert variant.height == 720
+
+
+def test_video_thumbnail_from_reddit_og_image():
+    # image_url on a *.redd.it host is host-gated in and used as the thumbnail.
+    resp = map_reddit_vx("d8qo81", VIDEO_VX, FOUR_WITH_AUDIO)
+    assert resp.items[0].thumbnail == "https://external-preview.redd.it/whatever.png"
+
+
+def test_video_thumbnail_foreign_host_dropped():
+    # A foreign og:image host must never be emitted into an <img> src.
+    evil = {**VIDEO_VX, "image_url": "https://evil.com/whatever.png"}
+    resp = map_reddit_vx("d8qo81", evil, FOUR_WITH_AUDIO)
+    assert resp.items[0].thumbnail is None
+
+
+def test_video_thumbnail_absent_image_url():
+    no_img = {**VIDEO_VX, "image_url": None}
+    resp = map_reddit_vx("d8qo81", no_img, FOUR_WITH_AUDIO)
+    assert resp.items[0].thumbnail is None
 
 
 def test_image_post_mapped_as_photo():

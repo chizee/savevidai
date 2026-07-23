@@ -106,6 +106,41 @@ GIF_POST = {
     }},
 }
 
+# Hosted video carrying a reddit-hosted preview image (html-escaped url, as the
+# API serves it) -> the video item thumbnail is the unescaped, host-gated url.
+VIDEO_POST_WITH_PREVIEW = {
+    "id": "1vpw00",
+    "author": "videoguy",
+    "title": "a hosted video",
+    "is_video": True,
+    "secure_media": {"reddit_video": {
+        "fallback_url": "https://v.redd.it/abcd1234efgh/DASH_1080.mp4?source=fallback",
+        "height": 1080,
+        "has_audio": True,
+        "duration": 30,
+    }},
+    "preview": {"images": [{"source": {
+        "url": "https://preview.redd.it/abcd1234efgh.jpg?width=640&amp;s=deadbeef",
+        "width": 640, "height": 360,
+    }}]},
+}
+
+# Hosted video whose preview image lives on a foreign host -> thumbnail refused.
+VIDEO_POST_FOREIGN_PREVIEW = {
+    "id": "1vfp00",
+    "author": "videoguy",
+    "title": "a hosted video",
+    "is_video": True,
+    "secure_media": {"reddit_video": {
+        "fallback_url": "https://v.redd.it/abcd1234efgh/DASH_1080.mp4?source=fallback",
+        "height": 1080,
+        "has_audio": True,
+    }},
+    "preview": {"images": [{"source": {
+        "url": "https://evil.example.com/abcd1234efgh.jpg?s=deadbeef",
+    }}]},
+}
+
 # Nothing downloadable.
 TEXT_POST = {"id": "1txt00", "author": "writer", "title": "just text", "is_self": True}
 
@@ -130,6 +165,24 @@ def test_video_ladder_filtered_to_source_height():
     # No audio -> direct v.redd.it DASH urls, never /api/mux.
     assert item.variants[0].url == "https://v.redd.it/silid5678zz/DASH_480.mp4"
     assert all("/api/mux/" not in v.url for v in item.variants)
+
+
+def test_video_thumbnail_from_preview_unescaped_and_host_gated():
+    resp = map_reddit_oauth("1vpw00", VIDEO_POST_WITH_PREVIEW)
+    # html.unescape turns &amp; back into &; host is preview.redd.it (allowed).
+    assert resp.items[0].thumbnail == (
+        "https://preview.redd.it/abcd1234efgh.jpg?width=640&s=deadbeef")
+
+
+def test_video_thumbnail_absent_preview_is_none():
+    # VIDEO_POST has no preview key at all: must not crash, thumbnail is None.
+    resp = map_reddit_oauth("1vid00", VIDEO_POST)
+    assert resp.items[0].thumbnail is None
+
+
+def test_video_thumbnail_foreign_preview_refused():
+    resp = map_reddit_oauth("1vfp00", VIDEO_POST_FOREIGN_PREVIEW)
+    assert resp.items[0].thumbnail is None
 
 
 def test_video_handle_and_author():

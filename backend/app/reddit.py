@@ -334,8 +334,10 @@ def map_reddit_vx(post_id: str, vx: dict, manifest: Manifest | None) -> ResolveR
     track and its variants point straight at the direct v.redd.it byte URL. With
     no video but an og:image on a genuine redd.it host, it is a single image item.
     Anything else (gallery/text, or an image on a foreign host we refuse to trust)
-    is an unsupported_post. og:image is never used as a video thumbnail: vxreddit's
-    value is a low-fidelity preview, so thumbnail is left None.
+    is an unsupported_post. For a video, the og:image IS used as the preview
+    thumbnail when it is present and hosted on a genuine redd.it host (a visible
+    preview beats an empty box); a missing or foreign-hosted og:image leaves the
+    thumbnail None so PreviewCard falls back gracefully.
     """
     handle = vx.get("author") or "unknown"
     common = {
@@ -345,6 +347,7 @@ def map_reddit_vx(post_id: str, vx: dict, manifest: Manifest | None) -> ResolveR
         "avatar_url": None,
         "text": vx.get("title") or "",
     }
+    image_url = vx.get("image_url")
     vredd_id = vx.get("vredd_id")
     if vredd_id and manifest is not None:
         variants = [
@@ -357,11 +360,11 @@ def map_reddit_vx(post_id: str, vx: dict, manifest: Manifest | None) -> ResolveR
             )
             for r in manifest.videos
         ]
-        item = MediaItem(index=1, kind="video", thumbnail=None,
+        thumbnail = image_url if image_url and _is_reddit_image_host(image_url) else None
+        item = MediaItem(index=1, kind="video", thumbnail=thumbnail,
                          duration_seconds=None, variants=variants)
         return ResolveResponse(items=[item], **common)
 
-    image_url = vx.get("image_url")
     if not vredd_id and image_url and _is_reddit_image_host(image_url):
         item = MediaItem(index=1, kind="image", thumbnail=None, duration_seconds=None,
                          variants=[Variant(label="photo", url=image_url)])
@@ -540,12 +543,35 @@ def _ext_from_mime(mime: str | None) -> str | None:
     return subtype
 
 
-def _oauth_video_item(source: dict, *, kind: str, use_mux: bool) -> MediaItem:
+def _oauth_thumbnail(post: dict) -> str | None:
+    """Recover a reddit-hosted preview thumbnail from an OAuth post dict, or None.
+
+    Prefers ``preview.images[0].source.url`` (HTML-escaped in the API, so it is
+    html.unescape'd), falling back to a plain http(s) ``thumbnail`` url. The
+    result is host-gated with ``_is_reddit_image_host`` because it is rendered in
+    an <img> tag; a missing/malformed preview or a foreign host yields None. The
+    ``.get`` chain is deliberately defensive so no shape ever raises here."""
+    images = ((post.get("preview") or {}).get("images")) or []
+    source = (images[0] if images else {}) or {}
+    url = ((source.get("source") or {}).get("url")) or None
+    if url:
+        url = html.unescape(url)
+    else:
+        thumb = post.get("thumbnail")
+        url = thumb if isinstance(thumb, str) and thumb.startswith(("http://", "https://")) else None
+    if url and _is_reddit_image_host(url):
+        return url
+    return None
+
+
+def _oauth_video_item(source: dict, *, kind: str, use_mux: bool,
+                      thumbnail: str | None = None) -> MediaItem:
     """Build a single video/gif MediaItem from a reddit_video-shaped ``source``.
 
     Emits the standard height ladder at or below the reported height. ``use_mux``
     routes audio-bearing videos through /api/mux (server-side remux); otherwise
-    variants point straight at the direct v.redd.it DASH byte URLs."""
+    variants point straight at the direct v.redd.it DASH byte URLs. ``thumbnail``
+    is an already-host-gated preview url (or None)."""
     vid = _vredd_from_fallback(source.get("fallback_url"))
     if not vid:
         raise app_error(UPSTREAM)
@@ -570,7 +596,7 @@ def _oauth_video_item(source: dict, *, kind: str, use_mux: bool) -> MediaItem:
     return MediaItem(
         index=1,
         kind=kind,
-        thumbnail=None,
+        thumbnail=thumbnail,
         duration_seconds=float(duration) if isinstance(duration, (int, float)) else None,
         variants=variants,
     )
@@ -621,7 +647,8 @@ def map_reddit_oauth(post_id: str, post: dict) -> ResolveResponse:
     reddit_video = (post.get("secure_media") or {}).get("reddit_video")
     if post.get("is_video") and reddit_video:
         use_mux = bool(reddit_video.get("has_audio"))
-        item = _oauth_video_item(reddit_video, kind="video", use_mux=use_mux)
+        item = _oauth_video_item(reddit_video, kind="video", use_mux=use_mux,
+                                 thumbnail=_oauth_thumbnail(post))
         return ResolveResponse(items=[item], **common)
 
     if post.get("is_gallery"):
