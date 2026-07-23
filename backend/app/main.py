@@ -63,7 +63,7 @@ def create_app() -> FastAPI:
             # public app's HTML entry ("/") stays blocked, so regular visitors
             # still see the maintenance page and never boot the main app.
             if (
-                path not in ("/api/health", "/admin")
+                path not in ("/api/health", "/admin", "/favicon.svg")
                 and not path.startswith("/maintenance/")
                 and not path.startswith("/api/admin/")
                 and not path.startswith("/assets/")
