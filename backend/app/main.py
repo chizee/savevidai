@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 
-from . import mux, proxy, resolve
+from . import maintenance, mux, proxy, resolve
 from .analytics import service as analytics_service
 from .analytics.config import load_config
 from .analytics.recorder import Recorder
@@ -21,7 +21,12 @@ logger = logging.getLogger("savevidai.analytics")
 
 
 def _maintenance_on() -> bool:
-    return os.environ.get("MAINTENANCE_MODE", "").strip().lower() in ("1", "true", "yes", "on")
+    return maintenance.is_on() or os.environ.get("MAINTENANCE_MODE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
 
 
 @asynccontextmanager

@@ -103,3 +103,21 @@ def test_missing_maintenance_html_fallback(tmp_path, monkeypatch):
     assert res.status_code == 503
     assert "Under maintenance" in res.text
     assert res.headers["cache-control"] == "no-store"
+
+
+def test_in_memory_flag_triggers_maintenance(tmp_path, monkeypatch):
+    # With MAINTENANCE_MODE unset, the in-memory flag alone drives the middleware.
+    from app import maintenance
+
+    _make_static(tmp_path)
+    monkeypatch.setenv("STATIC_DIR", str(tmp_path))
+    monkeypatch.delenv("MAINTENANCE_MODE", raising=False)
+    client = TestClient(create_app())
+
+    maintenance.set_on(False)
+    try:
+        assert client.get("/").status_code == 200
+        maintenance.set_on(True)
+        assert client.get("/").status_code == 503
+    finally:
+        maintenance.set_on(False)
