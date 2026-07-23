@@ -158,17 +158,22 @@ function TotalsTable({ totals }: { totals: Stats["totals"] }) {
 function BarList({
   title,
   rows,
+  maxRows,
 }: {
   title: string;
   rows: Array<{ label: string; count: number; note?: string }>;
+  maxRows?: number;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const max = Math.max(1, ...rows.map((r) => r.count));
+  const collapsible = maxRows !== undefined && rows.length > maxRows;
+  const visible = collapsible && !expanded ? rows.slice(0, maxRows) : rows;
   return (
     <div className="panel p-4">
       <h2 className="font-semibold">{title}</h2>
       <div className="mt-3 space-y-2">
         {rows.length === 0 && <p className="text-sm text-[var(--muted)]">No data yet.</p>}
-        {rows.map((r) => (
+        {visible.map((r) => (
           <div key={r.label} className="flex items-center gap-3">
             <span className="w-24 shrink-0 truncate font-mono text-sm">{r.label}</span>
             <span
@@ -180,6 +185,15 @@ function BarList({
           </div>
         ))}
       </div>
+      {collapsible && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-3 font-mono text-xs text-[var(--muted)]"
+        >
+          {expanded ? "Show less" : `Show all (${rows.length})`}
+        </button>
+      )}
     </div>
   );
 }
@@ -346,7 +360,7 @@ export function Dashboard({ stats }: { stats: Stats }) {
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <LineChart series={stats.series} />
-        <BarList title="Top countries" rows={stats.countries.map((c) => ({ label: c.country, count: c.count }))} />
+        <BarList title="Top countries" rows={stats.countries.map((c) => ({ label: c.country, count: c.count }))} maxRows={8} />
         <BarList
           title="By platform"
           rows={(stats.platforms ?? []).map((p) => ({
@@ -355,7 +369,7 @@ export function Dashboard({ stats }: { stats: Stats }) {
             note: `${p.downloads} downloads`,
           }))}
         />
-        <BarList title="Top qualities" rows={stats.qualities.map((q) => ({ label: q.quality, count: q.count }))} />
+        <BarList title="Top qualities" rows={stats.qualities.map((q) => ({ label: q.quality, count: q.count }))} maxRows={8} />
         <BarList title="Errors (FixTweet health)" rows={stats.errors.map((e) => ({ label: e.code, count: e.count }))} />
         <HourStrip hours={stats.hours} />
       </div>

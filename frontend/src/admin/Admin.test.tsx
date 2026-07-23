@@ -121,6 +121,37 @@ test("dashboard renders tiles, totals, and bar lists from a stats fixture", () =
   expect(screen.getAllByText(/no data yet/i).length).toBeGreaterThanOrEqual(2);
 });
 
+test("collapses a long qualities list behind a show-all toggle", async () => {
+  const qualities = Array.from({ length: 12 }, (_, i) => ({ quality: `q${i}`, count: 12 - i }));
+  render(<Dashboard stats={{ ...STATS, qualities }} />);
+
+  const panel = () => within(screen.getByText("Top qualities").closest(".panel") as HTMLElement);
+
+  // Collapsed: only the first 8 rows render, plus a "Show all (12)" toggle.
+  expect(panel().getByText("q0")).toBeInTheDocument();
+  expect(panel().getByText("q7")).toBeInTheDocument();
+  expect(panel().queryByText("q8")).not.toBeInTheDocument();
+  const toggle = panel().getByRole("button", { name: /show all \(12\)/i });
+
+  // Expanded: all 12 render, button now reads "Show less".
+  await userEvent.click(toggle);
+  expect(panel().getByText("q8")).toBeInTheDocument();
+  expect(panel().getByText("q11")).toBeInTheDocument();
+  expect(panel().getByRole("button", { name: /show less/i })).toBeInTheDocument();
+
+  // Collapse again: back to 8 rows.
+  await userEvent.click(panel().getByRole("button", { name: /show less/i }));
+  expect(panel().queryByText("q8")).not.toBeInTheDocument();
+  expect(panel().getByRole("button", { name: /show all \(12\)/i })).toBeInTheDocument();
+});
+
+test("shows no toggle when a maxRows panel has few enough rows", () => {
+  // STATS has a single quality row, well under the maxRows=8 threshold.
+  render(<Dashboard stats={STATS} />);
+  const panel = within(screen.getByText("Top qualities").closest(".panel") as HTMLElement);
+  expect(panel.queryByRole("button")).not.toBeInTheDocument();
+});
+
 test("renders the trend chart and busiest-hours strip when data exists", () => {
   const stats: Stats = {
     ...STATS,
