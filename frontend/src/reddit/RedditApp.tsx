@@ -7,7 +7,7 @@ import { SkeletonCard } from "../components/SkeletonCard";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { RedditHowToVisual } from "./RedditHowToVisual";
 import { useResolve } from "../hooks/useResolve";
-import { sendEvent } from "../lib/analytics";
+import { sendEvent, visitContext } from "../lib/analytics";
 import { EASE_OUT, fadeRise } from "../lib/motion";
 
 // A stable public video post, used as the one-click live demo. Live-verified
@@ -36,7 +36,7 @@ export default function RedditApp() {
   useEffect(() => {
     if (visitBeaconSent) return;
     visitBeaconSent = true;
-    sendEvent("visit", { platform: "reddit" });
+    sendEvent("visit", { platform: "reddit", ...visitContext() });
   }, []);
 
   // When a fetch lands, bring the preview card in front of the user's eyes.

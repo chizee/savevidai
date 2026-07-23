@@ -8,7 +8,7 @@ import { PreviewCard } from "./components/PreviewCard";
 import { SkeletonCard } from "./components/SkeletonCard";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { useResolve } from "./hooks/useResolve";
-import { sendEvent } from "./lib/analytics";
+import { sendEvent, visitContext } from "./lib/analytics";
 import { EASE_OUT, fadeRise } from "./lib/motion";
 
 // The maker's own video post, used as the one-click live demo.
@@ -36,7 +36,7 @@ export default function App() {
   useEffect(() => {
     if (visitBeaconSent) return;
     visitBeaconSent = true;
-    sendEvent("visit", { platform: "twitter" });
+    sendEvent("visit", { platform: "twitter", ...visitContext() });
   }, []);
 
   // When a fetch lands, bring the preview card in front of the user's eyes.

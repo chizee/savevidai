@@ -7,7 +7,7 @@ import { SkeletonCard } from "../components/SkeletonCard";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { TikTokHowToVisual } from "./TikTokHowToVisual";
 import { useResolve } from "../hooks/useResolve";
-import { sendEvent } from "../lib/analytics";
+import { sendEvent, visitContext } from "../lib/analytics";
 import { EASE_OUT, fadeRise } from "../lib/motion";
 
 // A stable public photo/video post, used as the one-click live demo.
@@ -34,7 +34,7 @@ export default function TikTokApp() {
   useEffect(() => {
     if (visitBeaconSent) return;
     visitBeaconSent = true;
-    sendEvent("visit", { platform: "tiktok" });
+    sendEvent("visit", { platform: "tiktok", ...visitContext() });
   }, []);
 
   // When a fetch lands, bring the preview card in front of the user's eyes.

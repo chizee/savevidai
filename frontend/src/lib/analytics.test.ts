@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { sendEvent } from "./analytics";
+import { classifySource, sendEvent, visitContext } from "./analytics";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -47,4 +47,67 @@ test("never throws when fetch itself throws synchronously", () => {
 test("swallows a rejected fetch (e.g. 404 when analytics is disabled) without throwing", () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 404 })));
   expect(() => sendEvent("visit")).not.toThrow();
+});
+
+test("classifySource buckets referrers into privacy-safe sources", () => {
+  expect(classifySource("", "savevidai.israfill.dev")).toBe("direct");
+  expect(
+    classifySource("https://savevidai.israfill.dev/x", "savevidai.israfill.dev"),
+  ).toBe("internal");
+  expect(classifySource("https://www.google.com/search", "savevidai.israfill.dev")).toBe("search");
+  expect(classifySource("https://google.co.uk/", "savevidai.israfill.dev")).toBe("search");
+  expect(classifySource("https://t.co/abc", "savevidai.israfill.dev")).toBe("social");
+  expect(classifySource("https://www.reddit.com/r/x", "savevidai.israfill.dev")).toBe("social");
+  expect(classifySource("https://someblog.com/post", "savevidai.israfill.dev")).toBe("referral");
+  expect(classifySource("not a url", "savevidai.israfill.dev")).toBe("direct");
+});
+
+test("visitContext returns new on first call then returning on the second", () => {
+  const store: Record<string, string> = {};
+  vi.stubGlobal("localStorage", {
+    getItem: (k: string) => (k in store ? store[k] : null),
+    setItem: (k: string, v: string) => {
+      store[k] = v;
+    },
+    removeItem: (k: string) => {
+      delete store[k];
+    },
+  });
+  vi.stubGlobal("document", { referrer: "" });
+  vi.stubGlobal("location", { hostname: "savevidai.israfill.dev" });
+
+  const first = visitContext();
+  expect(first).toEqual({ source: "direct", visitor_kind: "new" });
+  expect(store.svai_seen).toBe("1");
+
+  const second = visitContext();
+  expect(second).toEqual({ source: "direct", visitor_kind: "returning" });
+});
+
+test("a visit beacon carries source and visitor_kind from visitContext", () => {
+  const store: Record<string, string> = {};
+  vi.stubGlobal("localStorage", {
+    getItem: (k: string) => (k in store ? store[k] : null),
+    setItem: (k: string, v: string) => {
+      store[k] = v;
+    },
+    removeItem: (k: string) => {
+      delete store[k];
+    },
+  });
+  vi.stubGlobal("document", { referrer: "https://www.google.com/search" });
+  vi.stubGlobal("location", { hostname: "savevidai.israfill.dev" });
+  const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+    new Response(null, { status: 204 }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+
+  sendEvent("visit", { platform: "twitter", ...visitContext() });
+  const [, init] = fetchMock.mock.calls[0];
+  expect(JSON.parse(String(init?.body))).toEqual({
+    type: "visit",
+    platform: "twitter",
+    source: "search",
+    visitor_kind: "new",
+  });
 });

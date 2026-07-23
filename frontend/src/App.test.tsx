@@ -30,7 +30,9 @@ test("fires exactly one visit beacon per page load, even with StrictMode's doubl
   });
   expect(visitCalls).toHaveLength(1);
   const visitBody = JSON.parse(String((visitCalls[0][1] as RequestInit).body));
-  expect(visitBody).toEqual({ type: "visit", platform: "twitter" });
+  expect(visitBody).toMatchObject({ type: "visit", platform: "twitter" });
+  expect(typeof visitBody.source).toBe("string");
+  expect(typeof visitBody.visitor_kind).toBe("string");
 });
 
 test("links to the TikTok downloader page", () => {
