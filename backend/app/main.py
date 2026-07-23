@@ -52,7 +52,13 @@ def create_app() -> FastAPI:
             # /api/health must stay 200 so Render's health check keeps the deploy
             # live (a failing check would mark the deploy failed and roll back).
             # The maintenance page's own assets must load, so let them fall through.
-            if path != "/api/health" and not path.startswith("/maintenance/"):
+            # The cookie-authed admin API must also stay reachable, otherwise the
+            # operator is locked out and can never toggle maintenance back off.
+            if (
+                path != "/api/health"
+                and not path.startswith("/maintenance/")
+                and not path.startswith("/api/admin/")
+            ):
                 if path.startswith("/api/"):
                     return JSONResponse(
                         status_code=503,

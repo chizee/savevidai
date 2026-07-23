@@ -59,9 +59,22 @@ class LoginIn(BaseModel):
     password: str
 
 
+class MaintenanceIn(BaseModel):
+    on: bool
+
+
 def _require_enabled() -> None:
     if not service.enabled:
         raise HTTPException(status_code=404)
+
+
+def _forced_by_env() -> bool:
+    return os.environ.get("MAINTENANCE_MODE", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _maintenance_state() -> dict:
+    from ..maintenance import is_on
+    return {"on": is_on() or _forced_by_env(), "forced_by_env": _forced_by_env()}
 
 
 @router.post("/api/event", status_code=204)
@@ -105,6 +118,27 @@ def stats(request: Request, days: int = 30, tz: str = "0") -> JSONResponse:
         return JSONResponse(compute_stats(store, days, tz_min))
     except Exception:
         return JSONResponse(status_code=503, content={"error": "analytics_unavailable"})
+
+
+@router.get("/api/admin/maintenance")
+def get_maintenance(request: Request) -> JSONResponse:
+    _require_enabled()
+    cfg = service.config()
+    if not verify_cookie(request.cookies.get(COOKIE, ""), cfg.admin_password, time.time()):
+        return JSONResponse(status_code=401, content={"error": "unauthorized"})
+    return JSONResponse(_maintenance_state())
+
+
+@router.post("/api/admin/maintenance")
+@limiter.limit("10/minute")
+def set_maintenance(request: Request, payload: MaintenanceIn) -> JSONResponse:
+    _require_enabled()
+    cfg = service.config()
+    if not verify_cookie(request.cookies.get(COOKIE, ""), cfg.admin_password, time.time()):
+        return JSONResponse(status_code=401, content={"error": "unauthorized"})
+    from ..maintenance import set_on
+    set_on(payload.on)
+    return JSONResponse(_maintenance_state())
 
 
 @router.get("/admin")
