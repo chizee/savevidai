@@ -170,12 +170,26 @@ def compute_stats(store: Store, days: int, tz: int) -> dict:
     )
     sources = [{"source": r["source"], "count": r["count"]} for r in source_rows]
 
-    kind_rows = store.query(
-        f"SELECT visitor_kind, COUNT(*) AS count FROM events "
-        f"WHERE {window} AND type='visit' GROUP BY visitor_kind", [],
-    )
-    kind_counts = {r["visitor_kind"]: r["count"] for r in kind_rows}
-    visitors = {"new": kind_counts.get("new", 0), "returning": kind_counts.get("returning", 0)}
+    # visitors: DISTINCT people, split into non-overlapping new vs returning.
+    # A person fires exactly one 'new' event ever (first-ever page load), so the
+    # new set is the distinct daily-visitor hashes with a 'new' visit in the
+    # window. A brand-new visitor who browses multiple pages also fires
+    # 'returning' events on the SAME daily hash; counting visit EVENTS by kind
+    # would double-count them. So returning = distinct visitors seen ONLY as
+    # returning (their hash has no 'new' event in the window).
+    new_set = {
+        r["visitor"] for r in store.query(
+            f"SELECT DISTINCT visitor FROM events "
+            f"WHERE {window} AND type='visit' AND visitor_kind='new'", [],
+        )
+    }
+    returning_set = {
+        r["visitor"] for r in store.query(
+            f"SELECT DISTINCT visitor FROM events "
+            f"WHERE {window} AND type='visit' AND visitor_kind='returning'", [],
+        )
+    }
+    visitors = {"new": len(new_set), "returning": len(returning_set - new_set)}
 
     return {
         "totals": {

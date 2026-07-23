@@ -398,16 +398,25 @@ def test_sources_grouped_and_ordered_desc():
 
 
 def test_visitors_new_vs_returning_split():
+    # visitors counts DISTINCT people, not page-load events, and the two
+    # buckets are non-overlapping: a brand-new visitor who browses multiple
+    # pages fires one 'new' and one-or-more 'returning' events on the SAME
+    # daily hash, yet must count as new only.
     s = SqliteStore(":memory:")
     s.init_schema()
     rows = [
-        ("2026-07-20 10:00:00", "visit", None, "BD", "v1", None, None, "new"),
-        ("2026-07-20 10:01:00", "visit", None, "BD", "v2", None, None, "new"),
-        ("2026-07-20 10:02:00", "visit", None, "US", "v3", None, None, "new"),
-        ("2026-07-20 10:03:00", "visit", None, "US", "v4", None, None, "returning"),
-        ("2026-07-20 10:04:00", "visit", None, "US", "v5", None, None, "returning"),
+        # vA: a new person browsing two pages -> one 'new' + one 'returning'
+        # event on the same daily hash. Must count as NEW only, never returning.
+        ("2026-07-20 10:00:00", "visit", None, "BD", "vA", None, None, "new"),
+        ("2026-07-20 10:01:00", "visit", None, "BD", "vA", None, None, "returning"),
+        # vB: a returning person on two pages -> two 'returning' events on the
+        # same daily hash. Must count as ONE distinct returning, not two.
+        ("2026-07-20 10:02:00", "visit", None, "US", "vB", None, None, "returning"),
+        ("2026-07-20 10:03:00", "visit", None, "US", "vB", None, None, "returning"),
+        # vC: a new person on one page -> NEW.
+        ("2026-07-20 10:04:00", "visit", None, "US", "vC", None, None, "new"),
         # non-visit rows carry no visitor_kind and must be ignored
-        ("2026-07-20 10:05:00", "fetch", "ok", "US", "v1", None, None, None),
+        ("2026-07-20 10:05:00", "fetch", "ok", "US", "vA", None, None, None),
     ]
     s.execute_many([
         ("INSERT INTO events (ts,type,outcome,country,visitor,platform,source,visitor_kind) "
@@ -415,4 +424,6 @@ def test_visitors_new_vs_returning_split():
         for r in rows
     ])
     stats = compute_stats(s, days=30, tz=0)
-    assert stats["visitors"] == {"new": 3, "returning": 2}
+    # new = 2 (vA, vC); returning = 1 (vB only, since vA is excluded as new).
+    # The old COUNT(*)-by-kind logic would wrongly give new=2, returning=3.
+    assert stats["visitors"] == {"new": 2, "returning": 1}
