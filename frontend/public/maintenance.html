@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Under maintenance - SaveVid AI</title>
     <style>
       @font-face {
@@ -257,6 +258,12 @@
       } catch (e) {
         /* CSS fallback remains visible */
       }
+
+      // Auto-recover: reload every 20s so a visitor's tab returns to the live
+      // site on its own once maintenance ends, without a manual refresh.
+      setTimeout(function () {
+        window.location.reload();
+      }, 20000);
     </script>
   </body>
 </html>
