@@ -137,6 +137,8 @@ test("dashboard renders tiles, totals, and bar lists from a stats fixture", asyn
 test("collapses a long qualities list behind a show-all toggle", async () => {
   const qualities = Array.from({ length: 12 }, (_, i) => ({ quality: `q${i}`, count: 12 - i }));
   render(<Dashboard stats={{ ...STATS, qualities }} />);
+  // Flush the SiteControls mount fetch so its state update lands inside act().
+  await screen.findByText("Live");
 
   const panel = () => within(screen.getByText("Top qualities").closest(".panel") as HTMLElement);
 
