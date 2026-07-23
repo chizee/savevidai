@@ -4,6 +4,18 @@ import { afterEach, expect, test, vi } from "vitest";
 import { Admin, Dashboard } from "./Admin";
 import type { Stats } from "./api";
 
+// Dashboard now embeds SiteControls, which calls getMaintenance() on mount.
+// Stub that module method so these tests don't hit a real fetch; the rest of
+// ./api (login, fetchStats) stays real and rides the global fetch stubs.
+vi.mock("./api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./api")>();
+  return {
+    ...actual,
+    getMaintenance: vi.fn(async () => ({ on: false, forced_by_env: false })),
+    setMaintenance: vi.fn(async () => ({ on: false, forced_by_env: false })),
+  };
+});
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -98,8 +110,9 @@ test("sends the local UTC offset with the sign flipped from getTimezoneOffset", 
   expect(requestedUrl).toContain("tz=360");
 });
 
-test("dashboard renders tiles, totals, and bar lists from a stats fixture", () => {
+test("dashboard renders tiles, totals, and bar lists from a stats fixture", async () => {
   render(<Dashboard stats={STATS} />);
+  await screen.findByText("Live"); // flush SiteControls' mount fetch
   expect(screen.getByText("2")).toBeInTheDocument(); // active_now tile
   expect(screen.getByText("7")).toBeInTheDocument(); // unique_today tile
   expect(screen.getByText("90%")).toBeInTheDocument(); // success_rate
@@ -145,14 +158,15 @@ test("collapses a long qualities list behind a show-all toggle", async () => {
   expect(panel().getByRole("button", { name: /show all \(12\)/i })).toBeInTheDocument();
 });
 
-test("shows no toggle when a maxRows panel has few enough rows", () => {
+test("shows no toggle when a maxRows panel has few enough rows", async () => {
   // STATS has a single quality row, well under the maxRows=8 threshold.
   render(<Dashboard stats={STATS} />);
+  await screen.findByText("Live"); // flush SiteControls' mount fetch
   const panel = within(screen.getByText("Top qualities").closest(".panel") as HTMLElement);
   expect(panel.queryByRole("button")).not.toBeInTheDocument();
 });
 
-test("renders the trend chart and busiest-hours strip when data exists", () => {
+test("renders the trend chart and busiest-hours strip when data exists", async () => {
   const stats: Stats = {
     ...STATS,
     series: [
@@ -162,6 +176,7 @@ test("renders the trend chart and busiest-hours strip when data exists", () => {
     hours: [{ hour: 14, count: 12 }],
   };
   render(<Dashboard stats={stats} />);
+  await screen.findByText("Live"); // flush SiteControls' mount fetch
   expect(screen.getByText(/fetches vs downloads vs visits/i)).toBeInTheDocument();
   expect(screen.getByText(/busiest hours/i)).toBeInTheDocument();
   expect(screen.getByRole("img", { name: /line chart/i })).toBeInTheDocument();

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { SiteControls } from "./SiteControls";
 import { fetchStats, login, type Stats } from "./api";
 
 type Period = Stats["totals"]["fetches"];
@@ -348,6 +349,9 @@ export function Dashboard({ stats }: { stats: Stats }) {
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">SaveVid AI analytics</h1>
         <ThemeToggle />
+      </div>
+      <div className="mt-6">
+        <SiteControls />
       </div>
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Tile label="Active now" value={stats.active_now} />
