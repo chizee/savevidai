@@ -53,6 +53,13 @@ def test_event_accepts_slideshow_labels(enabled_client):
     assert client.post("/api/event", json={"type": "download", "quality": "photos"}).status_code == 422
 
 
+def test_event_accepts_reddit_platform(enabled_client):
+    client, *_ = enabled_client
+    assert client.post(
+        "/api/event", json={"type": "download", "quality": "720p", "platform": "reddit"}
+    ).status_code == 204
+
+
 def test_event_rejects_bad_platform(enabled_client):
     client, *_ = enabled_client
     assert client.post(

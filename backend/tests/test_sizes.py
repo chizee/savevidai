@@ -63,6 +63,19 @@ def test_malformed_content_length_leaves_none():
     assert resp.items[0].variants[1].size_bytes == 1048576
 
 
+def test_fill_sizes_skips_relative_mux_urls():
+    # Reddit muxed variants carry site-relative urls (/api/mux/...) that are ours;
+    # HEADing them through httpx is pointless and would error. No routes are
+    # registered, so any HEAD attempt would raise on the unmocked transport.
+    resp = ResolveResponse(id="1", author="a", handle="h", avatar_url=None, text="", items=[
+        MediaItem(index=1, kind="video", thumbnail=None, duration_seconds=None,
+                  variants=[Variant(label="720p", url="/api/mux/abc12345/720.mp4")]),
+    ])
+    with respx.mock:  # no routes registered: any HEAD would raise
+        fill_sizes(resp)
+    assert resp.items[0].variants[0].size_bytes is None
+
+
 def test_fill_sizes_skips_image_and_audio_kinds(respx_mock=None):
     import respx
     from app.schemas import MediaItem, ResolveResponse, Variant

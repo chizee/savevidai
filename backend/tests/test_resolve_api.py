@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 
 import app.resolve as resolve_module
 from app.cache import TTLCache
-from app.errors import PRIVATE, app_error
+from app.errors import NOT_FOUND, PRIVATE, app_error
 from app.limits import limiter
 from app.main import create_app
 from app.schemas import MediaItem, ResolveResponse, Variant
@@ -12,6 +12,13 @@ TT = ResolveResponse(
     id="7280000000000000000", author="User", handle="user", avatar_url=None,
     text="cap", items=[MediaItem(index=1, kind="video", thumbnail=None, duration_seconds=15,
         variants=[Variant(label="hd", url="https://www.tikwm.com/v/hd.mp4")])],
+)
+
+RED = ResolveResponse(
+    id="abc123", author="u/spez", handle="spez", avatar_url=None,
+    text="a reddit post", items=[MediaItem(index=1, kind="video", thumbnail=None,
+        duration_seconds=None,
+        variants=[Variant(label="720p", url="/api/mux/vidid1234/720.mp4")])],
 )
 
 FIXTURE = ResolveResponse(
@@ -66,6 +73,41 @@ def test_resolve_routes_tiktok(monkeypatch, client):
     r = client.post("/api/resolve", json={"url": "https://www.tiktok.com/@user/video/7280000000000000000"})
     assert r.status_code == 200
     assert r.json()["items"][0]["variants"][0]["label"] == "hd"
+
+
+def test_resolve_routes_reddit(monkeypatch, client):
+    monkeypatch.setattr(resolve_module, "extract_reddit", lambda parsed: RED)
+    r = client.post("/api/resolve", json={"url": "https://www.reddit.com/r/aww/comments/abc123/cute/"})
+    assert r.status_code == 200
+    assert r.json()["items"][0]["variants"][0]["label"] == "720p"
+
+
+def test_reddit_fetch_event_tagged_platform(monkeypatch, client):
+    events = []
+    monkeypatch.setattr(resolve_module, "extract_reddit", lambda parsed: RED)
+    monkeypatch.setattr(
+        resolve_module.analytics, "record_from_request",
+        lambda request, kind, outcome, platform=None: events.append((kind, outcome, platform)),
+    )
+    r = client.post("/api/resolve", json={"url": "https://www.reddit.com/r/aww/comments/abc123/cute/"})
+    assert r.status_code == 200
+    assert ("fetch", "ok", "reddit") in events
+
+
+def test_reddit_extractor_error_passthrough(monkeypatch, client):
+    def boom(parsed):
+        raise app_error(NOT_FOUND)
+
+    monkeypatch.setattr(resolve_module, "extract_reddit", boom)
+    r = client.post("/api/resolve", json={"url": "https://www.reddit.com/r/aww/comments/abc123/cute/"})
+    assert r.status_code == 404
+    assert r.json()["error"] == "not_found"
+
+
+def test_reddit_invalid_url(client):
+    r = client.post("/api/resolve", json={"url": "https://www.reddit.com/"})
+    assert r.status_code == 422
+    assert r.json()["error"] == "invalid_url"
 
 
 def test_resolve_rejects_unknown_platform(client):

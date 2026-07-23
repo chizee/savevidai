@@ -50,7 +50,7 @@ class EventIn(BaseModel):
     @field_validator("platform")
     @classmethod
     def _platform(cls, v):
-        if v is not None and v not in ("twitter", "tiktok"):
+        if v is not None and v not in ("twitter", "tiktok", "reddit"):
             raise ValueError("bad platform")
         return v
 

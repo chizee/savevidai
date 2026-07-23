@@ -12,6 +12,8 @@ def fill_sizes(resp: ResolveResponse, timeout: float = 3.0) -> None:
             for variant in item.variants:
                 if variant.size_bytes is not None:
                     continue  # already known (e.g. TikTok API prefills it); skip the HEAD
+                if variant.url.startswith("/"):
+                    continue  # site-relative mux urls (/api/mux/...) are ours; HEADing them is pointless
                 try:
                     r = client.head(variant.url)
                     length = r.headers.get("content-length")

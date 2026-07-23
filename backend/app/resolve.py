@@ -6,10 +6,11 @@ from .errors import INVALID_URL, AppError, app_error
 from .extractor import extract
 from .limits import limiter
 from .platforms import detect_platform
+from .reddit import extract_reddit
 from .schemas import ResolveRequest, ResolveResponse
 from .sizes import fill_sizes
 from .tiktok import extract_tiktok
-from .urls import InvalidTweetURL, parse_tiktok_url, parse_tweet_url
+from .urls import InvalidTweetURL, parse_reddit_url, parse_tiktok_url, parse_tweet_url
 
 router = APIRouter()
 cache = TTLCache(maxsize=512, ttl=3600.0)
@@ -29,12 +30,21 @@ def resolve(request: Request, payload: ResolveRequest) -> ResolveResponse:
 
             def resolver() -> ResolveResponse:
                 return extract(tweet_id)
-        else:
+        elif platform == "tiktok":
             tiktok_url = parse_tiktok_url(payload.url)
             key = f"tiktok:{tiktok_url}"
 
             def resolver() -> ResolveResponse:
                 return extract_tiktok(tiktok_url)
+        else:
+            parsed = parse_reddit_url(payload.url)
+            # ("post", id, path) keys on the post id; ("share", url, path) keys on
+            # the share url. Reddit DASH urls are not time-signed, so the default
+            # cache TTL applies (no override below, unlike tiktok's 900s).
+            key = f"reddit:{parsed[1]}"
+
+            def resolver() -> ResolveResponse:
+                return extract_reddit(parsed)
     except InvalidTweetURL as exc:
         analytics.record_from_request(request, "fetch", "invalid_url", platform=platform)
         raise app_error(INVALID_URL) from exc
