@@ -1,6 +1,31 @@
+import re
+
 from .store import Store
 
 _MAX_TZ = 840  # +/- 14 hours
+
+# Standard resolution ladder (pixel heights). fxtwitter and reddit emit the raw
+# source height as the quality label (`{height}p`), so odd-aspect / portrait
+# videos produce non-standard values like 1124p or 1054p that would otherwise
+# each become their own row in the dashboard's "Top qualities" panel. We snap
+# each raw height to the nearest rung for display; named labels (hd/sd/photo/...
+# from TikTok) are not heights and pass through untouched.
+_TIER_LADDER = (144, 240, 360, 480, 720, 1080, 1440, 2160)
+_HEIGHT_LABEL = re.compile(r"^(\d+)p$")
+
+
+def _bucket_quality(label: str) -> str:
+    """Snap a `{height}p` quality label to the nearest standard tier; return any
+    non-height label (hd, sd, video, photo, album, sound, ...) unchanged. Exact
+    midpoint ties resolve to the lower tier (the quality actually guaranteed)."""
+    m = _HEIGHT_LABEL.match(label)
+    if not m:
+        return label
+    h = int(m.group(1))
+    # min() scans the ascending ladder and keeps the FIRST minimal difference,
+    # so an exact tie lands on the lower rung.
+    tier = min(_TIER_LADDER, key=lambda t: abs(t - h))
+    return f"{tier}p"
 
 
 def parse_tz(raw) -> int:
@@ -113,10 +138,21 @@ def compute_stats(store: Store, days: int, tz: int) -> dict:
     unknown_count = _count_since(store, f"country IS NULL AND {window}", [])
     countries.append({"country": "unknown", "count": unknown_count})
 
-    qualities = store.query(
+    # Raw heights are bucketed to standard tiers in Python (not SQL) so several
+    # non-standard heights collapse into one row; re-sum and re-sort after the
+    # per-outcome GROUP BY.
+    quality_rows = store.query(
         f"SELECT outcome AS quality, COUNT(*) AS count FROM events "
-        f"WHERE type='download' AND {window} GROUP BY outcome ORDER BY count DESC", [],
+        f"WHERE type='download' AND {window} AND outcome IS NOT NULL GROUP BY outcome", [],
     )
+    quality_counts: dict[str, int] = {}
+    for r in quality_rows:
+        bucket = _bucket_quality(r["quality"])
+        quality_counts[bucket] = quality_counts.get(bucket, 0) + r["count"]
+    qualities = [
+        {"quality": q, "count": c}
+        for q, c in sorted(quality_counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
     errors = store.query(
         f"SELECT outcome AS code, COUNT(*) AS count FROM events "
         f"WHERE type='fetch' AND outcome != 'ok' AND {window} GROUP BY outcome ORDER BY count DESC", [],

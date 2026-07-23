@@ -2,7 +2,7 @@ from datetime import datetime, time, timedelta, timezone
 
 import pytest
 
-from app.analytics.stats import compute_stats, parse_tz
+from app.analytics.stats import _bucket_quality, compute_stats, parse_tz
 from app.analytics.store import SqliteStore
 
 
@@ -427,3 +427,55 @@ def test_visitors_new_vs_returning_split():
     # new = 2 (vA, vC); returning = 1 (vB only, since vA is excluded as new).
     # The old COUNT(*)-by-kind logic would wrongly give new=2, returning=3.
     assert stats["visitors"] == {"new": 2, "returning": 1}
+
+
+def test_bucket_quality_snaps_heights_to_nearest_standard_tier():
+    # Raw pixel-height labels (fxtwitter/reddit emit `{height}p` verbatim, so
+    # portrait/odd-aspect videos produce values like 1124p, 1054p, 680p) snap to
+    # the nearest standard rung on the ladder.
+    assert _bucket_quality("1124p") == "1080p"
+    assert _bucket_quality("1054p") == "1080p"
+    assert _bucket_quality("680p") == "720p"
+    assert _bucket_quality("500p") == "480p"
+    assert _bucket_quality("400p") == "360p"
+    # Exact standard tiers are unchanged.
+    assert _bucket_quality("1080p") == "1080p"
+    assert _bucket_quality("360p") == "360p"
+    # A genuine hi-res video is not squashed into 1080p.
+    assert _bucket_quality("1440p") == "1440p"
+    assert _bucket_quality("2100p") == "2160p"
+    # Exact midpoint ties resolve to the lower (guaranteed) tier.
+    assert _bucket_quality("600p") == "480p"
+
+
+def test_bucket_quality_passes_named_labels_through():
+    # TikTok emits named labels; they are not heights and must survive verbatim.
+    for label in ("hd", "sd", "video", "photo", "album", "sound"):
+        assert _bucket_quality(label) == label
+
+
+def test_qualities_bucketed_and_reaggregated():
+    s = SqliteStore(":memory:")
+    s.init_schema()
+    rows = [
+        # three distinct raw heights that all snap to 1080p -> must SUM to 3
+        ("2026-07-18 03:00:00", "download", "1124p", "BD", "v1"),
+        ("2026-07-18 03:01:00", "download", "1054p", "BD", "v2"),
+        ("2026-07-18 03:02:00", "download", "1080p", "BD", "v3"),
+        # two that snap to 720p
+        ("2026-07-18 03:03:00", "download", "680p", "BD", "v4"),
+        ("2026-07-18 03:04:00", "download", "720p", "BD", "v5"),
+        # a named tiktok label, untouched
+        ("2026-07-18 03:05:00", "download", "hd", "BD", "v6"),
+    ]
+    s.execute_many([
+        ("INSERT INTO events (ts,type,outcome,country,visitor) VALUES (?,?,?,?,?)", list(r))
+        for r in rows
+    ])
+    stats = compute_stats(s, days=30, tz=0)
+    qualities = {q["quality"]: q["count"] for q in stats["qualities"]}
+    assert qualities == {"1080p": 3, "720p": 2, "hd": 1}
+    # sorted by count descending (highest bucket first)
+    assert [q["count"] for q in stats["qualities"]] == sorted(
+        (q["count"] for q in stats["qualities"]), reverse=True
+    )
