@@ -1,8 +1,9 @@
-type Platform = "twitter" | "tiktok";
+type Platform = "twitter" | "tiktok" | "reddit";
 
 const PLATFORMS: { key: Platform; label: string; href: string }[] = [
   { key: "twitter", label: "Twitter / X", href: "/" },
   { key: "tiktok", label: "TikTok", href: "/tiktokvideodownloader" },
+  { key: "reddit", label: "Reddit", href: "/redditvideodownloader" },
 ];
 
 export function PlatformLinks({ active }: { active: Platform }) {

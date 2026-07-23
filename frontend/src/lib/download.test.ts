@@ -22,6 +22,11 @@ test("proxyUrl encodes url and filename", () => {
   expect(u).toBe("/api/proxy?url=https%3A%2F%2Fvideo.twimg.com%2Fv.mp4%3Ftag%3D1&filename=a%20b.mp4");
 });
 
+test("proxyUrl passes through site-relative mux urls, appending the filename", () => {
+  const u = proxyUrl("/api/mux/abc12345/720.mp4", "u_1_720p.mp4");
+  expect(u).toBe("/api/mux/abc12345/720.mp4?filename=u_1_720p.mp4");
+});
+
 test("downloads through the proxy and reports streaming progress", async () => {
   // Twitter's CDN 403s cross-origin fetches, so downloads must go through the
   // proxy. This asserts a single proxy request (never the raw CDN) and that

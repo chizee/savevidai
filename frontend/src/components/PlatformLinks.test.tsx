@@ -16,3 +16,19 @@ test("marks the active platform with aria-current and links the other way round"
   expect(twitter).toHaveAttribute("href", "/");
   expect(screen.getByText(/tiktok/i)).toHaveAttribute("aria-current", "page");
 });
+
+test("renders a reddit link with the exact href from other pages", () => {
+  render(<PlatformLinks active="twitter" />);
+  const reddit = screen.getByRole("link", { name: /reddit/i });
+  expect(reddit).toHaveAttribute("href", "/redditvideodownloader");
+});
+
+test("marks reddit active and links twitter and tiktok", () => {
+  render(<PlatformLinks active="reddit" />);
+  expect(screen.getByText(/reddit/i)).toHaveAttribute("aria-current", "page");
+  expect(screen.getByRole("link", { name: /twitter/i })).toHaveAttribute("href", "/");
+  expect(screen.getByRole("link", { name: /tiktok/i })).toHaveAttribute(
+    "href",
+    "/tiktokvideodownloader",
+  );
+});

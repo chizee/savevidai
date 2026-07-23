@@ -21,6 +21,11 @@ export function buildMediaFilename(
 }
 
 export function proxyUrl(url: string, filename: string): string {
+  // Site-relative URLs are our own endpoints (e.g. /api/mux/...): already
+  // same-origin, so skip the proxy and just append the download filename.
+  if (url.startsWith("/")) {
+    return `${url}?filename=${encodeURIComponent(filename)}`;
+  }
   return `/api/proxy?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
 }
 
