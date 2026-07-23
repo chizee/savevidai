@@ -189,7 +189,7 @@ function BarList({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-3 font-mono text-xs text-[var(--muted)]"
+          className="mt-3 cursor-pointer font-mono text-xs text-[var(--muted)] underline decoration-dotted underline-offset-4 transition-colors hover:text-[var(--fg)]"
         >
           {expanded ? "Show less" : `Show all (${rows.length})`}
         </button>
