@@ -32,6 +32,8 @@ class EventIn(BaseModel):
     type: str
     quality: str | None = None
     platform: str | None = None
+    source: str | None = None
+    visitor_kind: str | None = None
 
     @field_validator("type")
     @classmethod
@@ -52,6 +54,20 @@ class EventIn(BaseModel):
     def _platform(cls, v):
         if v is not None and v not in ("twitter", "tiktok", "reddit"):
             raise ValueError("bad platform")
+        return v
+
+    @field_validator("source")
+    @classmethod
+    def _source(cls, v):
+        if v is not None and v not in ("direct", "search", "social", "referral", "internal"):
+            raise ValueError("bad source")
+        return v
+
+    @field_validator("visitor_kind")
+    @classmethod
+    def _visitor_kind(cls, v):
+        if v is not None and v not in ("new", "returning"):
+            raise ValueError("bad visitor_kind")
         return v
 
 
@@ -82,7 +98,10 @@ def _maintenance_state() -> dict:
 def event(request: Request, payload: EventIn) -> Response:
     _require_enabled()
     outcome = payload.quality if payload.type == "download" else None
-    service.record_from_request(request, payload.type, outcome, platform=payload.platform)
+    source = payload.source if payload.type == "visit" else None
+    visitor_kind = payload.visitor_kind if payload.type == "visit" else None
+    service.record_from_request(request, payload.type, outcome, platform=payload.platform,
+                                source=source, visitor_kind=visitor_kind)
     return Response(status_code=204)
 
 

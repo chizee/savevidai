@@ -77,6 +77,36 @@ def test_event_rejects_bad_quality(enabled_client):
     assert client.post("/api/event", json={"type": "download", "quality": "; DROP"}).status_code == 422
 
 
+def test_visit_event_records_source_and_visitor_kind(enabled_client):
+    client, svc, store = enabled_client
+    r = client.post("/api/event", json={"type": "visit", "source": "search", "visitor_kind": "new"})
+    assert r.status_code == 204
+    svc.recorder().flush()
+    rows = store.query("SELECT source, visitor_kind FROM events WHERE type='visit'", [])
+    assert rows == [{"source": "search", "visitor_kind": "new"}]
+
+
+def test_visit_event_rejects_bad_source(enabled_client):
+    client, *_ = enabled_client
+    assert client.post("/api/event", json={"type": "visit", "source": "junk"}).status_code == 422
+
+
+def test_visit_event_rejects_bad_visitor_kind(enabled_client):
+    client, *_ = enabled_client
+    assert client.post("/api/event", json={"type": "visit", "visitor_kind": "maybe"}).status_code == 422
+
+
+def test_download_event_ignores_source(enabled_client):
+    client, svc, store = enabled_client
+    r = client.post(
+        "/api/event", json={"type": "download", "quality": "hd", "source": "search", "platform": "tiktok"}
+    )
+    assert r.status_code == 204
+    svc.recorder().flush()
+    rows = store.query("SELECT source FROM events WHERE type='download'", [])
+    assert rows == [{"source": None}]
+
+
 def test_login_and_stats_gate(enabled_client):
     client, *_ = enabled_client
     # no cookie -> 401
