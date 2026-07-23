@@ -88,9 +88,9 @@ def test_flush_swallows_store_failure_then_recovers():
     rec.record("visit", visitor="v2")
     assert rec.flush() == 1
     assert len(store.batches) == 1
-    # Each statement is (_INSERT, [ts, type, outcome, country, visitor, platform]);
-    # visitor is second-to-last, platform (None here) is last.
-    assert store.batches[0][0][1][-2] == "v2"
+    # Each statement is (_INSERT, [ts, type, outcome, country, visitor, platform,
+    # source, visitor_kind]); visitor is at index -4, platform at -3.
+    assert store.batches[0][0][1][-4] == "v2"
 
 
 def test_stop_flushes_remaining_events():
@@ -153,3 +153,16 @@ def test_record_writes_platform():
     r.record("fetch", visitor="vh", outcome="ok", platform="tiktok")
     r.flush()
     assert s.query("SELECT platform FROM events", [])[0]["platform"] == "tiktok"
+
+
+def test_record_writes_source_and_visitor_kind():
+    from app.analytics.recorder import Recorder
+    from app.analytics.store import SqliteStore
+    s = SqliteStore(":memory:")
+    s.init_schema()
+    r = Recorder(s)
+    r.record("visit", visitor="vh", source="search", visitor_kind="new")
+    r.flush()
+    row = s.query("SELECT source, visitor_kind FROM events", [])[0]
+    assert row["source"] == "search"
+    assert row["visitor_kind"] == "new"

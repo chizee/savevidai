@@ -7,7 +7,7 @@ from .store import Store
 
 logger = logging.getLogger("savevidai.analytics")
 
-_INSERT = "INSERT INTO events (ts, type, outcome, country, visitor, platform) VALUES (?,?,?,?,?,?)"
+_INSERT = "INSERT INTO events (ts, type, outcome, country, visitor, platform, source, visitor_kind) VALUES (?,?,?,?,?,?,?,?)"
 
 
 class Recorder:
@@ -28,7 +28,8 @@ class Recorder:
         self.dropped = 0
 
     def record(self, type: str, visitor: str, outcome: str | None = None,
-               country: str | None = None, platform: str | None = None) -> None:
+               country: str | None = None, platform: str | None = None,
+               source: str | None = None, visitor_kind: str | None = None) -> None:
         ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         dropped = False
         with self._lock:
@@ -36,7 +37,7 @@ class Recorder:
                 self._q.popleft()
                 self.dropped += 1
                 dropped = True
-            self._q.append((ts, type, outcome, country, visitor, platform))
+            self._q.append((ts, type, outcome, country, visitor, platform, source, visitor_kind))
         # Log outside the lock: logging can do slow I/O and must never block
         # record() while holding the lock that flush() also needs.
         if dropped:
