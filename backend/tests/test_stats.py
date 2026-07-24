@@ -485,3 +485,75 @@ def test_qualities_bucketed_and_reaggregated():
     assert [q["count"] for q in stats["qualities"]] == sorted(
         (q["count"] for q in stats["qualities"]), reverse=True
     )
+
+
+def _peak_store(rows):
+    s = SqliteStore(":memory:")
+    s.init_schema()
+    s.execute_many([
+        ("INSERT INTO events (ts,type,outcome,country,visitor) VALUES (?,?,?,?,?)", list(r))
+        for r in rows
+    ])
+    return s
+
+
+def test_peak_active_two_visitors_same_bucket():
+    # 03:01 and 03:03 both floor to the 03:00 bucket -> record count 2, and the
+    # record carries the bucket START (03:00), not either event's timestamp.
+    s = _peak_store([
+        ("2026-07-17 03:01:00", "visit", None, "BD", "v1"),
+        ("2026-07-17 03:03:00", "visit", None, "US", "v2"),
+    ])
+    stats = compute_stats(s, days=30, tz=0)
+    assert stats["peak_active"]["record"] == {
+        "count": 2, "day": "2026-07-17", "time": "03:00",
+    }
+
+
+def test_peak_active_tumbling_not_sliding():
+    # The same two visitors 2 minutes apart but STRADDLING a bucket boundary
+    # (03:04 -> bucket 03:00, 03:06 -> bucket 03:05). A sliding 5-minute window
+    # would report 2 concurrent; the tumbling-bucket definition reports 1.
+    s = _peak_store([
+        ("2026-07-17 03:04:00", "visit", None, "BD", "v1"),
+        ("2026-07-17 03:06:00", "visit", None, "US", "v2"),
+    ])
+    stats = compute_stats(s, days=30, tz=0)
+    assert stats["peak_active"]["record"]["count"] == 1
+
+
+def test_peak_active_repeat_visitor_counts_once():
+    # Same hash twice inside one bucket (a visit then a fetch) is ONE person.
+    s = _peak_store([
+        ("2026-07-17 03:01:00", "visit", None, "BD", "v1"),
+        ("2026-07-17 03:02:00", "fetch", "ok", "BD", "v1"),
+    ])
+    stats = compute_stats(s, days=30, tz=0)
+    assert stats["peak_active"]["record"]["count"] == 1
+
+
+def test_peak_active_series_attributes_buckets_to_local_day():
+    # tz=+360 (Dhaka-style). The 20:00 UTC bucket on Jul 17 is 02:00 LOCAL on
+    # Jul 18, so its 2-visitor peak must land on the 2026-07-18 series point
+    # and the record must render the local day/time, not the UTC ones.
+    s = _peak_store([
+        ("2026-07-17 20:01:00", "visit", None, "BD", "v1"),
+        ("2026-07-17 20:02:00", "visit", None, "BD", "v2"),
+        # A separate 1-visitor bucket that stays on local Jul 17 (09:00 local).
+        ("2026-07-17 03:00:00", "visit", None, "BD", "v3"),
+    ])
+    stats = compute_stats(s, days=30, tz=360)
+    assert stats["peak_active"]["series"] == [
+        {"day": "2026-07-17", "peak": 1},
+        {"day": "2026-07-18", "peak": 2},
+    ]
+    assert stats["peak_active"]["record"] == {
+        "count": 2, "day": "2026-07-18", "time": "02:00",
+    }
+
+
+def test_peak_active_empty_store():
+    s = SqliteStore(":memory:")
+    s.init_schema()
+    stats = compute_stats(s, days=30, tz=0)
+    assert stats["peak_active"] == {"record": None, "series": []}

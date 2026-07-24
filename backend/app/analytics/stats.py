@@ -75,6 +75,37 @@ def _period(store: Store, type_: str, tz: int) -> dict:
     }
 
 
+def _peak_active(store: Store, tz: int) -> dict:
+    """Peak concurrent visitors: highest COUNT(DISTINCT visitor) in any fixed
+    5-minute bucket. Buckets are TUMBLING windows floored on UTC epoch seconds
+    (bucket = epoch // 300 * 300) so concurrency itself is tz-independent; the
+    bucket start is then shifted to the owner's tz to render the record's
+    day/time and to attribute each bucket to a local calendar day for the
+    series. Intentionally NOT limited by the `days` window: the record is
+    "peak in the retained window" (events prune at 90 days)."""
+    tzmod = _tzmod(tz)
+    bucket = "(CAST(strftime('%s', ts) AS INTEGER) / 300) * 300"
+    local_day = f"date(datetime(b, 'unixepoch', '{tzmod}'))"
+    buckets = f"SELECT {bucket} AS b, COUNT(DISTINCT visitor) AS n FROM events GROUP BY b"
+
+    record = None
+    record_rows = store.query(
+        f"SELECT {local_day} AS day, "
+        f"strftime('%H:%M', datetime(b, 'unixepoch', '{tzmod}')) AS t, n "
+        f"FROM ({buckets}) ORDER BY n DESC, b ASC LIMIT 1", [],
+    )
+    if record_rows:
+        r = record_rows[0]
+        record = {"count": r["n"], "day": r["day"], "time": r["t"]}
+
+    series_rows = store.query(
+        f"SELECT {local_day} AS day, MAX(n) AS peak FROM ({buckets}) "
+        f"GROUP BY day ORDER BY day", [],
+    )
+    series = [{"day": r["day"], "peak": r["peak"]} for r in series_rows]
+    return {"record": record, "series": series}
+
+
 def compute_stats(store: Store, days: int, tz: int) -> dict:
     local = _local(tz)
     tzmod = _tzmod(tz)
@@ -249,4 +280,5 @@ def compute_stats(store: Store, days: int, tz: int) -> dict:
         "avg_active": avg_active,
         "sources": sources,
         "visitors": visitors,
+        "peak_active": _peak_active(store, tz),
     }
