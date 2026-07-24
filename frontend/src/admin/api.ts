@@ -13,6 +13,10 @@ export type Stats = {
   avg_active: { d7: number; d30: number };
   sources: Array<{ source: string; count: number }>;
   visitors: { new: number; returning: number };
+  peak_active: {
+    record: { count: number; day: string; time: string } | null;
+    series: Array<{ day: string; peak: number }>;
+  };
 };
 type Period = { today: number; d7: number; d30: number; all_time: number };
 

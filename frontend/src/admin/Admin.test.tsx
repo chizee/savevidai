@@ -46,6 +46,13 @@ const STATS: Stats = {
     { source: "direct", count: 90 },
   ],
   visitors: { new: 200, returning: 140 },
+  peak_active: {
+    record: { count: 9, day: "2026-07-21", time: "21:15" },
+    series: [
+      { day: "2026-07-20", peak: 4 },
+      { day: "2026-07-21", peak: 9 },
+    ],
+  },
 };
 
 test("shows login first, then dashboard after auth", async () => {
@@ -183,6 +190,8 @@ test("older-deploy stats without the new keys still render without throwing", as
   expect(screen.getByText("Traffic sources")).toBeInTheDocument();
   // Guards default avg-active to 0/0 rather than crashing on the missing key.
   expect(screen.getByText("Avg/day (7d)")).toBeInTheDocument();
+  // Missing peak_active defaults to { record: null, series: [] }, no crash.
+  expect(screen.getByText("Peak concurrent")).toBeInTheDocument();
 });
 
 test("collapses a long qualities list behind a show-all toggle", async () => {
@@ -232,5 +241,29 @@ test("renders the trend chart and busiest-hours strip when data exists", async (
   await screen.findByText("Live"); // flush SiteControls' mount fetch
   expect(screen.getByText(/fetches vs downloads vs visits/i)).toBeInTheDocument();
   expect(screen.getByText(/busiest hours/i)).toBeInTheDocument();
-  expect(screen.getByRole("img", { name: /line chart/i })).toBeInTheDocument();
+  expect(screen.getByRole("img", { name: /line chart of daily fetches/i })).toBeInTheDocument();
+});
+
+test("shows the peak concurrent tile with caption and the peak chart", async () => {
+  render(<Dashboard stats={STATS} />);
+  await screen.findByText("Live"); // flush SiteControls' mount fetch
+  const tile = within(screen.getByText("Peak concurrent").closest(".panel") as HTMLElement);
+  expect(tile.getByText("9")).toBeInTheDocument();
+  // 21:15 renders as 9:15pm; month wording is locale-formatted, so pin only
+  // the clock and the honesty caption.
+  expect(tile.getByText(/9:15pm - last 90 days/)).toBeInTheDocument();
+  expect(screen.getByText("Peak concurrent per day")).toBeInTheDocument();
+  expect(
+    screen.getByRole("img", { name: /line chart of daily peak concurrent visitors/i }),
+  ).toBeInTheDocument();
+});
+
+test("peak concurrent tile shows a dash when there is no record", async () => {
+  render(<Dashboard stats={{ ...STATS, peak_active: { record: null, series: [] } }} />);
+  await screen.findByText("Live"); // flush SiteControls' mount fetch
+  const tile = within(screen.getByText("Peak concurrent").closest(".panel") as HTMLElement);
+  expect(tile.getAllByText("-").length).toBeGreaterThanOrEqual(1);
+  // Empty series falls back to the shared "No data yet." empty state.
+  const chartPanel = within(screen.getByText("Peak concurrent per day").closest(".panel") as HTMLElement);
+  expect(chartPanel.getByText(/no data yet/i)).toBeInTheDocument();
 });
