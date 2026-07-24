@@ -31,6 +31,7 @@ def test_lru_eviction():
 
 def test_set_with_ttl_override_expires_earlier(monkeypatch):
     import time as time_mod
+
     from app.cache import TTLCache
     now = [1000.0]
     monkeypatch.setattr(time_mod, "monotonic", lambda: now[0])

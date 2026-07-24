@@ -101,7 +101,7 @@ def create_app() -> FastAPI:
         if path.startswith("/api/"):
             # API responses (health, resolve, mux, proxy, event) are left untouched.
             return response
-        if path.startswith("/assets/") or path.startswith("/fonts/"):
+        if path.startswith(("/assets/", "/fonts/")):
             # Hashed filenames never change under a given name; safe to cache forever.
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         elif response.headers.get("content-type", "").startswith("text/html"):

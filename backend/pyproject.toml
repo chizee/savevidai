@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "respx>=0.21", "ruff>=0.5"]
+dev = ["pytest>=8", "respx>=0.21", "ruff==0.16.0"]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -23,6 +23,15 @@ include = ["app*"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
+# ruff is pinned (see the dev extra) so this gate stays deterministic across
+# machines and CI. We keep ruff's default rule set and ignore only BLE001:
+# the analytics recorder and request path deliberately catch `Exception` so a
+# store/network failure can never crash a download or the site (each site is
+# commented at the catch). ASYNC230 stays enabled and is suppressed inline at
+# its two known sites so future blocking-IO-in-async is still caught.
+ignore = ["BLE001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

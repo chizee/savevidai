@@ -78,6 +78,7 @@ def test_fill_sizes_skips_relative_mux_urls():
 
 def test_fill_sizes_skips_image_and_audio_kinds(respx_mock=None):
     import respx
+
     from app.schemas import MediaItem, ResolveResponse, Variant
     from app.sizes import fill_sizes
     resp = ResolveResponse(id="1", author="a", handle="h", avatar_url=None, text="", items=[

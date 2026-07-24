@@ -1,7 +1,7 @@
 import logging
 import threading
 from collections import deque
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from .store import Store
 
@@ -30,7 +30,7 @@ class Recorder:
     def record(self, type: str, visitor: str, outcome: str | None = None,
                country: str | None = None, platform: str | None = None,
                source: str | None = None, visitor_kind: str | None = None) -> None:
-        ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        ts = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
         dropped = False
         with self._lock:
             if len(self._q) >= self._max:

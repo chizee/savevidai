@@ -46,7 +46,7 @@ def test_download_event_accepts_tiktok_labels(enabled_client):
 
 
 def test_event_accepts_slideshow_labels(enabled_client):
-    client, svc, store = enabled_client
+    client, _svc, _store = enabled_client
     for q in ("photo", "album", "sound"):
         r = client.post("/api/event", json={"type": "download", "quality": q, "platform": "tiktok"})
         assert r.status_code == 204, q

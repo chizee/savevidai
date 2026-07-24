@@ -13,7 +13,7 @@ import re
 
 import httpx
 
-from .errors import NOT_FOUND, NO_VIDEO, PRIVATE, UPSTREAM, AppError, app_error
+from .errors import NO_VIDEO, NOT_FOUND, PRIVATE, UPSTREAM, AppError, app_error
 from .schemas import MediaItem, ResolveResponse, Variant
 
 logger = logging.getLogger("savevidai.extractor")

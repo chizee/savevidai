@@ -186,8 +186,8 @@ def test_is_configured_requires_both_keys(monkeypatch):
 def test_extract_reddit_anonymous_video_end_to_end(monkeypatch):
     monkeypatch.delenv("REDDIT_CLIENT_ID", raising=False)
     monkeypatch.delenv("REDDIT_CLIENT_SECRET", raising=False)
-    from tests.test_reddit_vx import REAL_VX
     from tests.test_reddit_manifest import OLD_MPD
+    from tests.test_reddit_vx import REAL_VX
     respx.get("https://www.vxreddit.com/comments/d8qo81").mock(
         return_value=httpx.Response(200, text=REAL_VX))
     respx.get("https://v.redd.it/enxxsuo5xko31/DASHPlaylist.mpd").mock(

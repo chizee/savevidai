@@ -1,6 +1,6 @@
 from urllib.parse import urlparse
 
-from .urls import REDDIT_HOSTS, TIKTOK_HOSTS, _HOSTS
+from .urls import _HOSTS, REDDIT_HOSTS, TIKTOK_HOSTS
 
 
 def detect_platform(url: str) -> str | None:

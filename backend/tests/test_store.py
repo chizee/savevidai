@@ -99,8 +99,8 @@ def test_source_and_visitor_kind_columns_present_and_idempotent():
     s.init_schema()
     s.init_schema()  # second call must not raise (migration idempotent)
     s.execute_many([(
-        "INSERT INTO events (ts, type, outcome, country, visitor, source, visitor_kind) "
-        "VALUES (?,?,?,?,?,?,?)",
+        ("INSERT INTO events (ts, type, outcome, country, visitor, source, visitor_kind) "
+         "VALUES (?,?,?,?,?,?,?)"),
         ["2026-07-20 10:00:00", "fetch", "ok", None, "vh", "twitter", "returning"],
     )])
     rows = s.query("SELECT source, visitor_kind FROM events", [])
@@ -134,8 +134,8 @@ def test_source_and_visitor_kind_alter_migration_on_legacy_table():
     s.init_schema()  # second call must be idempotent, no raise
 
     s.execute_many([(
-        "INSERT INTO events (ts, type, outcome, country, visitor, source, visitor_kind) "
-        "VALUES (?,?,?,?,?,?,?)",
+        ("INSERT INTO events (ts, type, outcome, country, visitor, source, visitor_kind) "
+         "VALUES (?,?,?,?,?,?,?)"),
         ["2026-07-20 11:00:00", "fetch", "ok", None, "vl", "twitter", "new"],
     )])
     rows = s.query("SELECT source, visitor_kind FROM events", [])

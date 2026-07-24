@@ -79,7 +79,7 @@ class _FakeProc:
 
     async def communicate(self):
         if self._write:
-            with open(self._out, "wb") as f:
+            with open(self._out, "wb") as f:  # noqa: ASYNC230 - test double, not real async IO
                 f.write(MARKER)
         return (b"", b"ffmpeg stderr")
 

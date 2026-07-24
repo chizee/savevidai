@@ -108,7 +108,7 @@ async def _write_stream(resp: httpx.Response, dest: str, budget: list[int]) -> N
     the budget is shared, the video and audio bodies can never together exceed the
     ceiling even when neither advertises a size.
     """
-    with open(dest, "wb") as out:
+    with open(dest, "wb") as out:  # noqa: ASYNC230 - per-request temp file, fast local write
         async for chunk in resp.aiter_bytes(1 << 16):
             budget[0] += len(chunk)
             if budget[0] > _MAX_BYTES:
@@ -193,7 +193,7 @@ async def mux(request: Request, vid: str, height: int, filename: str = "video.mp
         )
         try:
             _, stderr = await asyncio.wait_for(proc.communicate(), timeout=_FFMPEG_TIMEOUT)
-        except (asyncio.TimeoutError, TimeoutError):
+        except TimeoutError:
             proc.kill()
             await proc.wait()
             logger.warning("ffmpeg timed out merging %s", vid)

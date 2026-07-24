@@ -139,7 +139,7 @@ def test_parse_reddit_share_junk_token_raises():
 
 
 def test_parse_reddit_share_valid_builds_literal_path():
-    kind, value, path = parse_reddit_url("https://old.reddit.com/r/AskReddit/s/Xy9ZaB2c")
+    kind, _value, path = parse_reddit_url("https://old.reddit.com/r/AskReddit/s/Xy9ZaB2c")
     assert kind == "share"
     assert path == "/r/AskReddit/s/Xy9ZaB2c"
 

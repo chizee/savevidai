@@ -1,4 +1,4 @@
-from datetime import datetime, time, timedelta, timezone
+from datetime import UTC, datetime, time, timedelta
 
 import pytest
 
@@ -129,7 +129,7 @@ def test_compute_stats_nonzero_tz_window_not_truncated_and_hour_shift():
     tz = 360
     days = 30
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     local_now = now + timedelta(minutes=tz)
     earliest_local_day = (local_now - timedelta(days=days)).date()
     earliest_local_midnight_utc = datetime.combine(earliest_local_day, time.min) - timedelta(minutes=tz)
@@ -216,7 +216,7 @@ def test_platforms_breakdown_nonzero_tz_window_not_truncated():
     tz = 360
     days = 30
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     local_now = now + timedelta(minutes=tz)
     earliest_local_day = (local_now - timedelta(days=days)).date()
     earliest_local_midnight_utc = datetime.combine(earliest_local_day, time.min) - timedelta(minutes=tz)
@@ -285,7 +285,7 @@ def test_platforms_breakdown_ordered_by_fetches_desc():
 
 
 def _day_ts(offset_days: int, hour: int = 12) -> str:
-    d = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=offset_days)
+    d = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=offset_days)
     return d.replace(hour=hour, minute=0, second=0, microsecond=0).strftime("%Y-%m-%d %H:%M:%S")
 
 
@@ -306,8 +306,8 @@ def test_avg_active_d7_d30_daily_uniques_over_fixed_window():
     for i in range(40):
         rows.append((_day_ts(15), "visit", None, "BD", f"b_{i}", None, None, None))
     s.execute_many([
-        ("INSERT INTO events (ts,type,outcome,country,visitor,platform,source,visitor_kind) "
-         "VALUES (?,?,?,?,?,?,?,?)", list(r))
+        (("INSERT INTO events (ts,type,outcome,country,visitor,platform,source,visitor_kind) "
+          "VALUES (?,?,?,?,?,?,?,?)"), list(r))
         for r in rows
     ])
     stats = compute_stats(s, days=7, tz=0)
@@ -334,7 +334,7 @@ def test_avg_active_excludes_today_and_buckets_by_local_day():
     tz = -360  # local is 6h BEHIND UTC, so early-UTC-today is local yesterday
     window_days = 7
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     local_now = now + timedelta(minutes=tz)
     local_today = local_now.date()
 
@@ -356,15 +356,15 @@ def test_avg_active_excludes_today_and_buckets_by_local_day():
     # 10 distinct visitors on local today-1 -> INCLUDED in the window.
     for i in range(10):
         events.append((
-            "INSERT INTO events (ts,type,outcome,country,visitor,platform,source,visitor_kind) "
-            "VALUES (?,?,?,?,?,?,?,?)",
+            ("INSERT INTO events (ts,type,outcome,country,visitor,platform,source,visitor_kind) "
+             "VALUES (?,?,?,?,?,?,?,?)"),
             [fmt(yday_utc), "visit", None, "BD", f"y{i}", None, None, None],
         ))
     # 100 distinct visitors on local today (ts = now) -> EXCLUDED as partial.
     for i in range(100):
         events.append((
-            "INSERT INTO events (ts,type,outcome,country,visitor,platform,source,visitor_kind) "
-            "VALUES (?,?,?,?,?,?,?,?)",
+            ("INSERT INTO events (ts,type,outcome,country,visitor,platform,source,visitor_kind) "
+             "VALUES (?,?,?,?,?,?,?,?)"),
             [fmt(now), "visit", None, "BD", f"t{i}", None, None, None],
         ))
     s.execute_many(events)
@@ -389,8 +389,8 @@ def test_sources_grouped_and_ordered_desc():
         ("2026-07-20 10:04:00", "visit", None, "US", "v4", None, None, None),
     ]
     s.execute_many([
-        ("INSERT INTO events (ts,type,outcome,country,visitor,platform,source,visitor_kind) "
-         "VALUES (?,?,?,?,?,?,?,?)", list(r))
+        (("INSERT INTO events (ts,type,outcome,country,visitor,platform,source,visitor_kind) "
+          "VALUES (?,?,?,?,?,?,?,?)"), list(r))
         for r in rows
     ])
     stats = compute_stats(s, days=30, tz=0)
@@ -419,8 +419,8 @@ def test_visitors_new_vs_returning_split():
         ("2026-07-20 10:05:00", "fetch", "ok", "US", "vA", None, None, None),
     ]
     s.execute_many([
-        ("INSERT INTO events (ts,type,outcome,country,visitor,platform,source,visitor_kind) "
-         "VALUES (?,?,?,?,?,?,?,?)", list(r))
+        (("INSERT INTO events (ts,type,outcome,country,visitor,platform,source,visitor_kind) "
+          "VALUES (?,?,?,?,?,?,?,?)"), list(r))
         for r in rows
     ])
     stats = compute_stats(s, days=30, tz=0)

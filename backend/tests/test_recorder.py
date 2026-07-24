@@ -125,8 +125,7 @@ def test_concurrent_record_respects_bound():
             with rec._lock:
                 cur = len(rec._q)
             with observed_lock:
-                if cur > observed_max:
-                    observed_max = cur
+                observed_max = max(observed_max, cur)
 
     threads = [threading.Thread(target=worker, args=(t,)) for t in range(n_threads)]
     for t in threads:
