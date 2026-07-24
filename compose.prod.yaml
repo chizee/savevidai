@@ -1,0 +1,33 @@
+# Production stack for a single VPS (Hetzner CX22 or similar).
+# Builds the CURRENT checkout of main (the GHCR :latest image is stale, it only
+# rebuilds on version tags), then fronts it with Caddy for automatic HTTPS.
+#
+#   docker compose -f compose.prod.yaml up -d --build
+#
+# Only Caddy is exposed to the internet; the app is reachable to Caddy only,
+# over the compose network as app:8000 (see Caddyfile).
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - ./deploy/app.env
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy_data:
+  caddy_config:
